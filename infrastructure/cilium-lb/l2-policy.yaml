@@ -1,0 +1,8 @@
+# infrastructure/cilium-lb/l2-policy.yaml
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: homelab-l2
+spec:
+  loadBalancerIPs: true
+  externalIPs: true

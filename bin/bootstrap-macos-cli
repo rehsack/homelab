@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# bootstrap-macos-cli — install CLI tools for homelab cluster management
+# Idempotent: safe to run multiple times.
+
+readonly TOOLS=(
+    talosctl
+    kubernetes-cli      # provides kubectl
+    helm
+    cilium-cli
+    keepassxc           # provides keepassxc-cli
+)
+
+# --- preflight ---
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    echo "ERROR: This script is for macOS only." >&2
+    exit 1
+fi
+
+if ! command -v brew &>/dev/null; then
+    echo "ERROR: Homebrew not found. Install from https://brew.sh" >&2
+    exit 1
+fi
+
+# --- install / upgrade ---
+
+echo "Updating Homebrew..."
+brew update
+
+for tool in "${TOOLS[@]}"; do
+    if brew ls --versions "$tool" &>/dev/null; then
+        echo "  ✓ $tool (already installed)"
+    else
+        echo "  → Installing $tool..."
+        brew install "$tool"
+    fi
+done
+
+echo ""
+echo "Done. Installed tools:"
+echo "  talosctl   $(talosctl version --client --short 2>/dev/null || echo '?')"
+echo "  kubectl    $(kubectl version --client -o json 2>/dev/null | grep gitVersion | head -1 | tr -d ' ",' | cut -d: -f2 || echo '?')"
+echo "  helm       $(helm version --short 2>/dev/null || echo '?')"
+echo "  cilium     $(cilium version --client 2>/dev/null | head -1 || echo '?')"
+echo "  keepassxc-cli  $(keepassxc-cli --version 2>/dev/null || echo '?')"

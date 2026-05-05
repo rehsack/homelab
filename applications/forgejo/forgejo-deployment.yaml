@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forgejo
+  namespace: soho
+  labels:
+    app.kubernetes.io/name: forgejo
+    app.kubernetes.io/component: git-forge
+    app.kubernetes.io/part-of: forgejo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: forgejo
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: forgejo
+        app.kubernetes.io/component: git-forge
+        app.kubernetes.io/part-of: forgejo
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: init-config
+          image: busybox:1.37
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /data/custom/conf
+              if [ ! -f /data/custom/conf/app.ini ]; then
+                cp /etc/forgejo/app.ini /data/custom/conf/app.ini
+                echo "app.ini copied from ConfigMap"
+              else
+                echo "app.ini already exists, skipping"
+              fi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /etc/forgejo
+      containers:
+        - name: forgejo
+          image: codeberg.org/forgejo/forgejo:14-rootless
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: http
+              containerPort: 3000
+            - name: ssh
+              containerPort: 2222
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/gitea
+          livenessProbe:
+            httpGet:
+              path: /api/healthz
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/healthz
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: forgejo-data
+        - name: config
+          configMap:
+            name: forgejo-config
+      # -----------------------------------------------------------
+      # Admin user creation (run once after first deployment):
+      #
+      #   kubectl -n soho exec deploy/forgejo -- \
+      #     forgejo admin user create \
+      #       --admin \
+      #       --username <USER> \
+      #       --password <PASSWORD> \
+      #       --email <EMAIL> \
+      #       --must-change-password=false
+      #
+      # Or using the secret values:
+      #
+      #   export SECRET=$(kubectl -n soho get secret forgejo-admin-secret -o jsonpath='{.data}')
+      #   kubectl -n soho exec deploy/forgejo -- \
+      #     forgejo admin user create \
+      #       --admin \
+      #       --username "$(echo $SECRET | jq -r '.FORGEJO_ADMIN_USER' | base64 -d)" \
+      #       --password "$(echo $SECRET | jq -r '.FORGEJO_ADMIN_PASSWORD' | base64 -d)" \
+      #       --email "$(echo $SECRET | jq -r '.FORGEJO_ADMIN_EMAIL' | base64 -d)" \
+      #       --must-change-password=false
+      # -----------------------------------------------------------

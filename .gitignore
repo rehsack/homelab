@@ -1,0 +1,14 @@
+.*.sw?
+*.bak
+*~
+build/
+.gradle/
+.vscode/
+*.pdf
+
+# age private key — NEVER commit
+keys.txt
+*.age.key
+
+# direnv (project-local env, contains SOPS_AGE_KEY_FILE path)
+.envrc

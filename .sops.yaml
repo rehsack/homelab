@@ -1,0 +1,8 @@
+creation_rules:
+  - path_regex: talos/.*
+    encrypted_regex: "^(id|secret|bootstraptoken|secretboxencryptionsecret|secretboxEncryptionSecret|token|crt|key|ca)$"
+    age: age1jaaskelzvxfu575y9m7qa7v5qcdg2qx345ktjh3rmgsjn2xch5tqsdzr7g
+
+  - path_regex: applications/.*
+    encrypted_regex: "^(stringData|data)$"
+    age: age1jaaskelzvxfu575y9m7qa7v5qcdg2qx345ktjh3rmgsjn2xch5tqsdzr7g

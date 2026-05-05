@@ -1,0 +1,114 @@
+= Forgejo Deployment
+
+Git-Forge auf Basis von Forgejo (SQLite, rootless) im Namespace `soho`.
+
+== Deployment
+
+[source,bash]
+----
+kubectl apply -f applications/forgejo/namespace.yaml
+kubectl apply -f applications/forgejo/forgejo-pvc.yaml
+kubectl apply -f applications/forgejo/forgejo-config.yaml
+kubectl apply -f applications/forgejo/forgejo-secret.yaml
+kubectl apply -f applications/forgejo/forgejo-deployment.yaml
+kubectl apply -f applications/forgejo/forgejo-service.yaml
+----
+
+== Admin-User erstellen
+
+Credentials aus dem KeePass-Tresor holen und den Admin-User anlegen:
+
+[source,bash]
+----
+ADMIN_USER=$(bin/kdbx-fetch cred --entry forgejo/admin --attribute UserName --quiet)
+ADMIN_PASS=$(bin/kdbx-fetch cred --entry forgejo/admin --attribute Password --quiet)
+ADMIN_MAIL=$(bin/kdbx-fetch cred --entry forgejo/admin --attribute URL --quiet)
+
+kubectl -n soho exec deploy/forgejo -- \
+  forgejo admin user create \
+    --admin \
+    --username "${ADMIN_USER}" \
+    --password "${ADMIN_PASS}" \
+    --email "${ADMIN_MAIL}" \
+    --must-change-password=false
+----
+
+Der Befehl ist idempotent — bei erneutem Aufruf meldet er, dass der User bereits existiert.
+
+== ConfigMap aktualisieren
+
+Falls die `app.ini` in der ConfigMap geändert wird, muss die Kopie im PVC gelöscht werden, damit der Init-Container sie neu kopiert:
+
+[source,bash]
+----
+kubectl apply -f applications/forgejo/forgejo-config.yaml
+kubectl -n soho exec deploy/forgejo -- rm /var/lib/gitea/custom/conf/app.ini
+kubectl -n soho rollout restart deploy/forgejo
+----
+
+== Storage
+
+Das PVC `forgejo-data` ist unabhängig vom Pod und Deployment.
+Daten bleiben erhalten, solange das PVC existiert — auch wenn das Deployment gelöscht und neu erstellt wird.
+
+CAUTION: Die StorageClass `rook-cephfs` hat `reclaimPolicy: Delete`.
+Wird das PVC gelöscht, werden auch die Daten unwiderruflich entfernt.
+
+=== PVC einsehen
+
+[source,bash]
+----
+kubectl -n soho get pvc
+kubectl -n soho describe pvc forgejo-data
+----
+
+=== PVC vergrößern (online, ohne Datenverlust)
+
+Die StorageClass hat `allowVolumeExpansion: true`.
+Größe in `forgejo-pvc.yaml` anpassen (z.B. `50Gi` → `100Gi`) und applyen:
+
+[source,bash]
+----
+kubectl apply -f applications/forgejo/forgejo-pvc.yaml
+----
+
+CephFS expandiert online — kein Pod-Neustart nötig.
+
+=== CephFS-Nutzung überblicken
+
+Gesamtkapazität und Belegung:
+
+[source,bash]
+----
+kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph df
+----
+
+Einzelne Subvolumes (entsprechen den PVCs) auflisten:
+
+[source,bash]
+----
+kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph fs subvolume ls cephfs --group_name csi
+----
+
+Nutzung eines konkreten Subvolumes:
+
+[source,bash]
+----
+kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph fs subvolume info cephfs <subvolume-name> --group_name csi
+----
+
+=== Pod-zu-PVC-Zuordnung
+
+Alle PVCs clusterübergreifend:
+
+[source,bash]
+----
+kubectl get pvc -A
+----
+
+Welcher Pod nutzt welches PVC:
+
+[source,bash]
+----
+kubectl get pods -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\t"}{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{" "}{end}{"\n"}{end}'
+----

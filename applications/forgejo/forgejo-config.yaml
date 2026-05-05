@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: forgejo-config
+  namespace: soho
+  labels:
+    app.kubernetes.io/name: forgejo
+    app.kubernetes.io/component: git-forge
+    app.kubernetes.io/part-of: forgejo
+data:
+  app.ini: |
+    [server]
+    ; After Cilium LB-IPAM assigns an IP, replace 192.168.47.200 with the actual IP
+    ROOT_URL = http://192.168.47.200:3000
+    DOMAIN = 192.168.47.200
+    SSH_DOMAIN = 192.168.47.200
+    SSH_LISTEN_PORT = 2222
+    HTTP_PORT = 3000
+    START_SSH_SERVER = true
+
+    [database]
+    DB_TYPE = sqlite3
+    PATH = /var/lib/gitea/data/forgejo.db
+
+    [service]
+    DISABLE_REGISTRATION = true
+
+    [security]
+    INSTALL_LOCK = true
+
+    [repository]
+    ROOT = /var/lib/gitea/data/gitea/repositories
+
+    [lfs]
+    PATH = /var/lib/gitea/data/gitea/lfs

@@ -1,0 +1,17 @@
+machine:
+  install:
+    image: factory.talos.dev/metal-installer/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588:v1.13.0
+    disk: /dev/sda
+    wipe: true
+  network:
+    hostname: f5a-01
+    interfaces:
+      - interface: enp197s0
+        dhcp: true
+        vip:
+          ip: 192.168.47.240
+  nodeLabels:
+    node.kubernetes.io/role: controlplane-worker
+  sysctls:
+    vm.dirty_ratio: "10"
+    vm.dirty_background_ratio: "5"
