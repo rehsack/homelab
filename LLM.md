@@ -6,7 +6,7 @@ Single-node Talos Linux cluster on Acemagic F5A (AMD HX370, 96GB RAM), expanding
 
 | Component       | Details                                                    |
 |-----------------|------------------------------------------------------------|
-| OS              | Talos Linux 1.13.0                                         |
+| OS              | Talos Linux 1.13.2                                         |
 | Kubernetes      | 1.35.0                                                     |
 | CNI             | Cilium 1.19.1 (kube-proxy replacement, WireGuard encryption, Hubble UI) |
 | Storage         | Rook-Ceph, 2× Samsung 990 PRO 4TB NVMe as OSDs            |
