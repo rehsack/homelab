@@ -1,0 +1,31 @@
+# Talos Image Factory Schematics
+# https://factory.talos.dev
+#
+# Each node type has a schematic ID that pins its set of extensions.
+# Use the factory installer for upgrades to preserve the schematic in META:
+#   talosctl upgrade --image factory.talos.dev/metal-installer/<schematic>:<version>
+
+nodes:
+  f5a-01:
+    description: Acemagic F5A (AMD HX370, 96GB RAM)
+    schematic: fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588
+    extensions:
+      - siderolabs/amd-ucode
+      - siderolabs/amdgpu
+      - siderolabs/iscsi-tools
+      - siderolabs/nvme-cli
+      - siderolabs/util-linux-tools
+    install_image: factory.talos.dev/metal-installer/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588:v1.13.2
+    boot_iso: factory.talos.dev/image/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588/v1.13.2/metal-amd64.iso
+
+  nuc-01:
+    description: Intel NUC6i7KYK (32GB RAM, boot from USB-SSD)
+    schematic: 348c0beb41fee9b42ba171a299b7d0d53cef5b2513841c23ed72e21bc1959d96
+    extensions:
+      - siderolabs/i915
+      - siderolabs/intel-ucode
+      - siderolabs/iscsi-tools
+      - siderolabs/nvme-cli
+      - siderolabs/util-linux-tools
+    install_image: factory.talos.dev/metal-installer/348c0beb41fee9b42ba171a299b7d0d53cef5b2513841c23ed72e21bc1959d96:v1.13.2
+    boot_iso: factory.talos.dev/image/348c0beb41fee9b42ba171a299b7d0d53cef5b2513841c23ed72e21bc1959d96/v1.13.2/metal-amd64.iso

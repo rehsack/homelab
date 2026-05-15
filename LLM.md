@@ -43,7 +43,8 @@ Single-node Talos Linux cluster on Acemagic F5A (AMD HX370, 96GB RAM), expanding
 
 ```
 homelab/
-├── talos/              # Talos machine configs, patches, secrets — NOT applied via kubectl
+├── talos/              # Talos machine configs, patches, secrets, schematics — NOT applied via kubectl
+│   └── schematics.yaml # Image Factory schematic IDs and extensions per node
 ├── infrastructure/     # Cluster infrastructure (storage, networking)
 │   ├── rook-ceph/      # Rook-Ceph operator, CephCluster, StorageClass
 │   └── cilium-lb/          # LB-IPAM pool + L2 announcement policy
@@ -59,6 +60,7 @@ homelab/
 - **StorageClass**: Always `rook-cephfs` for PVCs.
 - **Secrets**: Real values in YAML, field-level encrypted via SOPS+age. Edit with `sops <file>`, decrypt with `sops -d <file>`.
 - **Namespaces**: `soho` for business/SOHO workloads (Forgejo, CI). Future: per-customer namespaces for VPN isolation.
+- **Talos upgrades**: Always use the per-node Image Factory installer from `talos/schematics.yaml`, never the generic `ghcr.io/siderolabs/installer`. This preserves extensions and the schematic ID in META.
 - Refer to existing YAMLs in `infrastructure/rook-ceph/` for formatting style.
 
 ## Design Principles
