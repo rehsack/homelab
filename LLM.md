@@ -1,4 +1,4 @@
-# CLAUDE.md — homelab Kubernetes Cluster
+# LLM.md — homelab Kubernetes Cluster
 
 ## Cluster Overview
 
@@ -18,6 +18,12 @@ Single-node Talos Linux cluster on Acemagic F5A (AMD HX370, 96GB RAM), expanding
 | Ingress         | None yet                                                   |
 | Secrets         | SOPS + age (field-level encryption in Git); cluster-side decryption TBD |
 
+- **Talos 1.13 reproducible images**: Same build → identical disk image (raw images;
+  VHD/VMDK excluded). Reinforces the schematic-pinned upgrade workflow.
+- **Talos 1.13 enables CDI by default**; extension services can drop CDI specs under
+  /run/cdi. This is the path for exposing the AMD iGPU/NPU to LLM pods (llama.cpp +
+  ROCm/Vulkan) on HX-class nodes. Kernel is now 6.18.x (good for recent amdgpu).
+
 ### Secrets Management
 
 * SOPS + age for field-level encryption — see `doc/secrets-management.md`
@@ -33,11 +39,82 @@ Single-node Talos Linux cluster on Acemagic F5A (AMD HX370, 96GB RAM), expanding
 - Virtual IPs: `192.168.47.240` – `192.168.47.249` (Talos VIP etc.)
 - Control Plane VIP: `192.168.47.240`
 
-## Node Expansion (imminent)
+## Storage Tiering: Persistent vs. Volatile (per-disk, not per-node)
 
-- **Phase 2**: Intel NUC6i7KYK (32GB RAM, 2× Samsung 990 PRO 4TB NVMe) — lightweight workloads, 2 Ceph OSDs. Boot from external USB-SSD (NOT a Ceph OSD).
-- **Phase 3**: Beelink SER6 Pro (32GB RAM) — third control plane node, no dedicated Ceph OSDs.
-- **Phase 4**: Minisforum MS-02 Ultra (Intel 285HX, up to 256GB ECC RAM, 4× M.2) — additional Ceph OSDs, Ceph reaches `size: 3`.
+The cluster's core storage rule is NOT "storage nodes vs. compute nodes". It is:
+
+- **Persistent / CephFS-friendly**: Services with replicated state (Forgejo, Nexus,
+  PostgreSQL, SonarQube, registries). Live on Ceph OSDs.
+- **Volatile / CephFS-hostile**: Compile jobs (Yocto, OCI image builds) generate
+  millions of small temp files / hardlink churn — toxic to CephFS MDS and replication.
+  MUST live on LOCAL scratch storage, NEVER on Ceph. Never mirrored.
+- **Compute-heavy / CephFS-neutral**: LLM inference. Model weights are read-once from
+  Ceph (RWX, fine), then resident in RAM. Memory-bandwidth-bound, no persistent write.
+- **Disk selection for volumes uses CEL `diskSelector`** (Talos 1.13). Match the three
+  internal NVMe by stable properties — and ALWAYS scope with `disk.transport == "nvme"`
+  so the USB-C boot SSD (`/dev/sda`) can never be matched by an OSD or scratch selector.
+  Within the NVMe set: match by `disk.model` to separate the two Samsung 990 PRO (OSDs)
+  from the differently-modelled scratch NVMe; use `disk.serial`/`disk.wwid` to
+  distinguish the two identical 990 PRO from each other. Size constants need the
+  unsigned suffix `u` (e.g. `disk.size > 100u * GiB`). Inspect real values first with
+  `talosctl get disks -o yaml`.
+
+KEY INSIGHT: This boundary runs between DISKS, not between MACHINES. A single node may
+host Ceph OSDs (persistent) AND a dedicated local NVMe (volatile scratch) simultaneously,
+as long as the disks are deterministically separated via CEL diskSelector. Build
+artifacts are persisted by an EXPLICIT CI step (push to registry) — never by an
+automatic cluster mechanism. The cluster never "knows" about the volatile cache.
+
+OPEN TENSION (to resolve when scheduling volatile workloads): a build pod needing the
+local scratch NVMe must land on the node that physically has it — which conflicts with
+the "No nodeSelector/nodeAffinity" rule in Conventions. Local-disk affinity vs. pod
+mobility is an unresolved design point. Flag, don't silently violate.
+
+## Node Expansion
+
+> **History note**: The original Phase 2 plan (Intel NUC6i7KYK as second OSD host)
+> is VOID. The NUC6i7KYK failed (dead display output, unclearable CMOS error,
+> no DHCP lease — retired to the "repair someday" pile, not scrap). Its two Samsung
+> 990 PRO 4TB drives were removed for reuse in the replacement node. This forced a
+> cleaner architecture (see "Storage Tiering" below): the per-node "storage vs.
+> compute" split was replaced by a per-disk "persistent vs. volatile" model.
+
+- **Phase 2 (active): Minisforum MS-A2** (Ryzen 9 9955HX, Zen 5 Fire Range,
+  16C/32T, Radeon 610M iGPU, *no XDNA NPU*). Dual SO-DIMM DDR5-5600, 3× M.2
+  PCIe 4.0 (manual warns: full bestückung → 2 of 3 throttle to Gen3 thermally;
+  irrelevant for our workloads — Ceph is net-bound, Yocto is IOPS-bound, see
+  `doc/ssd-selection.md`). NICs verified on arrival: 2× Intel i226-V (`igc`,
+  enp3s0/enp4s0) + 2× Marvell AQC113C (`atlantic`, enp5s0f0np0/f1np1) — all
+  detected by stock 6.18 kernel, no driver extension needed.
+  - **K8s role: worker** (NOT CP). Avoids the 2-node etcd quorum trap (where
+    loss of either CP would freeze the cluster — 2 members need 2 votes to make
+    progress). Promotion to CP happens in Phase 3 coordinated with SER6, going
+    directly 1→3 etcd members in one step.
+  - **Storage role**: 2× Samsung 990 PRO 4TB (ex-NUC) as Ceph OSDs;
+    1× differently-modelled NVMe (TBD, next week) in the 3rd M.2 as LOCAL
+    volatile scratch (UserVolumeConfig, never a Ceph OSD). Boot from external
+    USB-C NVMe enclosure (ASMedia bridge): use the *non-USB4* Type-C port —
+    the USB4 port enters a renegotiation loop with this bridge chip.
+  - **Compute role**: persistent workloads (Forgejo, PostgreSQL, SonarQube,
+    Nexus, registries) + volatile builds (Yocto, OCI). *No LLM inference* —
+    Fire Range has no NPU and the Radeon 610M iGPU is too weak.
+  - With Node 2 online: Ceph failure domain transitions `osd` → `host`.
+    Control plane endpoint stays at `.40` (no VIP transition, no 2-CP trap).
+- **Phase 3: Beelink SER6 Pro** (Ryzen 7 7735HS, Zen3+, 32GB) — pure VOLATILE
+  COMPUTE node (Yocto/OCI builds on local NVMe). Weak 680M iGPU → not an LLM
+  node. Joins **together with promoting MS-A2 to CP** — 1→3 etcd in one
+  coordinated step, skipping the 2-node quorum trap. Control plane endpoint
+  transitions to VIP `192.168.47.240` once 3-CP topology is healthy.
+- **Phase 4 (tentative): Minisforum MS-02 Ultra** or successor — additional
+  Ceph OSDs toward `size: 3`. With 4-node topology the typical pattern is
+  3 CPs + 1 worker (etcd stays at 3, MS-02 joins as pure worker). POSSIBLE
+  second dual-purpose node IF the MS-A2 CEL per-disk separation proves stable
+  in practice. Bonus: boots from internal M.2, no USB-boot needed. Do NOT
+  plan around this until the MS-A2 setup proves itself.
+
+**Disaster recovery**: see `doc/disaster-recovery.md` — MS-A2 can be promoted
+to CP under f5a-01 total failure; multiple paths documented, none requiring
+new hardware.
 
 ## Repo Structure
 
@@ -70,6 +147,7 @@ homelab/
 - **CNI before storage**: Cilium must be in place before Rook-Ceph. Never replace CNI while Ceph holds data.
 - **Boot drives ≠ Ceph OSDs**: Boot media is always separate from Ceph storage.
 - **Declarative**: All config in git. Secrets encrypted (SOPS+age). Target: `git clone` + age key + `sops -d | kubectl apply` = running cluster.
+- **CP topology is orthogonal to storage tiering**: a node's K8s role (control plane vs worker) is driven by etcd quorum needs (odd numbers, currently 1→3 jump), not by what disks it holds. Storage tiering rules apply equally to CP and worker nodes.
 
 ## Current Deployment Order
 
