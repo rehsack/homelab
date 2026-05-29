@@ -1,0 +1,18 @@
+machine:
+  install:
+    image: factory.talos.dev/metal-installer/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588:v1.13.2
+    disk: /dev/sdb
+    wipe: true
+  network:
+    hostname: ms-a2-01
+    interfaces:
+      - interface: enp3s0
+        dhcp: true
+  nodeLabels:
+    node.kubernetes.io/role: worker
+    homelab.local/ceph-osd: "true"
+    homelab.local/scratch-nvme: "false"
+    homelab.local/llm-capable: "false"
+  sysctls:
+    vm.dirty_ratio: "10"
+    vm.dirty_background_ratio: "5"

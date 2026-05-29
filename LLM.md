@@ -138,6 +138,18 @@ homelab/
 - **Secrets**: Real values in YAML, field-level encrypted via SOPS+age. Edit with `sops <file>`, decrypt with `sops -d <file>`.
 - **Namespaces**: `soho` for business/SOHO workloads (Forgejo, CI). Future: per-customer namespaces for VPN isolation.
 - **Talos upgrades**: Always use the per-node Image Factory installer from `talos/schematics.yaml`, never the generic `ghcr.io/siderolabs/installer`. This preserves extensions and the schematic ID in META.
+- **Node labels for storage tiering**: every node declares its resource-capability
+  axes via three boolean `homelab.local/*` labels set in its MachineConfig
+  `nodeLabels`. This makes the per-disk storage tiering visible from the K8s API
+  without violating the no-nodeSelector/affinity rule on workloads — the labels
+  are descriptive metadata, scheduling mechanism (taints? PV node-affinity?)
+  remains TBD per the OPEN TENSION above.
+  - `homelab.local/ceph-osd`: node hosts Ceph OSDs (persistent storage)
+  - `homelab.local/scratch-nvme`: node has dedicated local volatile NVMe
+  - `homelab.local/llm-capable`: NPU + adequate iGPU/memory bandwidth for inference
+  Current matrix (ceph-osd, scratch-nvme, llm-capable):
+  f5a-01 = (true, false, true); ms-a2-01 = (true, false → true once 3rd NVMe lands, false);
+  ser6 = (false, true, false); ms-02 = tbd.
 - Refer to existing YAMLs in `infrastructure/rook-ceph/` for formatting style.
 
 ## Design Principles
