@@ -120,8 +120,8 @@ NIC `enp3s0` am Switch.
 **Pre-flight**: USB-C-NVMe-Gehäuse muss stabil enumeriert sein (vorher
 Port-Wechsel testen, falls dmesg-Disconnects am Bildschirm sichtbar).
 
-**Patches**: `talos/ms-a2-01-machine.yaml`, `talos/ms-a2-01-volumes.yaml`,
-`talos/cilium-patch.yaml`.
+**Patches**: `talos/ms-a2-01-machine.yaml`, `talos/ms-a2-01-hostname.yaml`,
+`talos/ms-a2-01-volumes.yaml`, `talos/cilium-patch.yaml`.
 
 **Schematic**: `talos/schematics.yaml` → `ms-a2-01` (identischer Hash wie
 f5a-01 dank content-addressing — gleiche Extension-Set).
@@ -147,8 +147,27 @@ sops exec-file talos/secrets.yaml \
         --output /tmp/ms-a2-01.yaml \
         --config-patch @talos/cilium-patch.yaml \
         --config-patch @talos/ms-a2-01-machine.yaml \
+        --config-patch @talos/ms-a2-01-hostname.yaml \
         --config-patch @talos/ms-a2-01-volumes.yaml \
         --force'
+
+# 2a) Workaround für siderolabs/talos#12573:
+#     Die auto-generierte HostnameConfig hat `auto: stable` als Default. Unser
+#     ms-a2-01-hostname.yaml Patch FÜGT `hostname: ms-a2-01` strategic-merged
+#     HINZU, kann aber `auto: stable` nicht ENTFERNEN. Talos lehnt beide
+#     gemeinsam ab ("'auto' and 'hostname' cannot be set at the same time").
+#     JSON-6902-Patches sind für multi-document configs nicht unterstützt
+#     ("JSON6902 patches are not supported for multi-document machine
+#     configuration"). Lösung: nach gen-config die `auto:`-Zeile direkt aus
+#     dem HostnameConfig-Block streichen.
+sed -i.bak '/^kind: HostnameConfig$/,/^---$/ { /^auto:/d; }' /tmp/ms-a2-01.yaml
+# Verify (sollte nur `hostname:` zeigen, kein `auto:`):
+sed -n '/^kind: HostnameConfig$/,/^---$/p' /tmp/ms-a2-01.yaml
+
+# Note: derselbe Workaround gilt analog für f5a-01, sobald wir dessen Patches
+# beim 1.13.3-Upgrade nachziehen. f5a-01 setzt hostname aktuell noch über
+# machine.network.hostname (v1alpha1-Mechanismus), das wird beim Re-Patch
+# voraussichtlich denselben Konflikt mit der HostnameConfig erzeugen.
 
 # 3) Sanity-Check vor Apply (kritische Felder):
 grep -n -E "hostname:|disk:|wipe:|image:|interface:|homelab.local|node.kubernetes.io" /tmp/ms-a2-01.yaml

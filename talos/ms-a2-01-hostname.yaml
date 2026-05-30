@@ -1,0 +1,8 @@
+# Strategic merge: adds `hostname: ms-a2-01` to the auto-generated HostnameConfig
+# document. Talos cannot also REMOVE the default `auto: stable` via merge (known
+# issue siderolabs/talos#12573 — see doc/disaster-recovery.md runbook for the
+# post-gen sed workaround).
+apiVersion: v1alpha1
+kind: HostnameConfig
+hostname: ms-a2-01
+
