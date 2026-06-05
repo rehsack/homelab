@@ -148,7 +148,7 @@ homelab/
   - `homelab.local/scratch-nvme`: node has dedicated local volatile NVMe
   - `homelab.local/llm-capable`: NPU + adequate iGPU/memory bandwidth for inference
   Current matrix (ceph-osd, scratch-nvme, llm-capable):
-  f5a-01 = (true, false, true); ms-a2-01 = (true, false → true once 3rd NVMe lands, false);
+  f5a-01 = (true, false, true); ms-a2-01 = (true, true, false);
   ser6 = (false, true, false); ms-02 = tbd.
 - Refer to existing YAMLs in `infrastructure/rook-ceph/` for formatting style.
 
