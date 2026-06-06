@@ -133,9 +133,48 @@ talosctl version -n 192.168.47.39 -e 192.168.47.39 --insecure
 # 1) Disks verifizieren — model-Strings müssen mit den CEL-Selectors matchen:
 talosctl get disks -n 192.168.47.39 -e 192.168.47.39 --insecure -o yaml
 #    Erwartet (siehe CLAUDE.md → Storage Tiering):
-#      nvme0n1, nvme1n1 = "Samsung SSD 990 PRO 4TB" (Ceph-OSDs)
-#      sda = "SanDisk 3.2Gen1" (Boot-Stick)
-#      sdb = "M.2 NVME SSD" (USB-C-Gehäuse, Install-Target)
+#      nvme0n1, nvme1n1 = "Samsung SSD 990 PRO 4TB" (Ceph-OSDs, intern)
+#      nvme2n1          = "Samsung SSD 970 EVO Plus 2TB" (Yocto-Scratch,
+#                         3. interner M.2-Slot; UserVolumeConfig)
+#      sda              = "SSD Plus 250GB A" oder ähnlich
+#                         (UGREEN-USB-C-Gehäuse mit SanDisk PLUS 250 GB
+#                         NVMe, Install-Target)
+#      sdb              = "SanDisk 3.2Gen1" (Boot-Stick, USB-A)
+#
+#    Caveat 1: die Reihenfolge sda/sdb hängt von der USB-Enumeration ab.
+#    Immer per `talosctl get disks` verifizieren, NICHT raten. Bei
+#    abweichender Reihenfolge `install.disk` im machine-Patch anpassen,
+#    BEVOR apply-config.
+#
+#    Caveat 2: USB-NVMe-Bridges sind nicht alle gleich. ASMedia-Bridges
+#    (ASM2362, ASM2364) hatten auf AMD-Ryzen-USB4-Hosts (Fire Range /
+#    Rembrandt / Phoenix) reproduzierbare USB4-Negotiation-Loops mit
+#    Disconnect-Storm. Empirisch validiert: UGREEN-Gehäuse mit RTL9210B
+#    (Modell 15512) am rückseitigen USB 3.2 Gen 2x1 Port (NICHT am USB4
+#    vorne). Siehe `doc/ssd-selection.md` für Marktstand.
+#
+# 1a) Recovery-Hinweis: wenn Talos beim Boot vom Stick in einer Schleife
+#     hängt mit Console-Output "task haltIfInstalled: Talos is already
+#     installed to disk but booted from another media", dann hat ein
+#     vorheriger (möglicherweise gescheiterter) Install META-Reste auf
+#     einer der Disks hinterlassen. Zwei Auswege:
+#     - Wenn die "installed" Disk physisch ziehbar ist: abziehen, neu
+#       booten — Talos sieht keine bestehende Installation mehr und
+#       geht sauber in Maintenance Mode.
+#     - Wenn nicht (z.B. interne NVMe): am Bootloader-Menü vom Stick
+#       `e` drücken zum Edit der Kernel-Cmdline. Der Parameter
+#       `talos.halt_if_installed=1` steht bereits in der `linux`-Zeile
+#       (Default vom Schematic-Build). Den Wert auf `0` ändern — also
+#       `=1` zu `=0` umschreiben, NICHT zusätzlich anhängen. Mit Ctrl-X
+#       (GRUB) oder F10 booten. Talos ignoriert dann den existing-install
+#       für diesen einen Boot und geht sauber in Maintenance Mode.
+#       Bei den nächsten Boots ist die Cmdline wieder Default — also
+#       entweder erneut editieren oder (besser) die "installed" Disk
+#       per Maintenance-API wipen:
+#         talosctl wipe disk <kurzname> -i -n IP -e IP
+#       (Kurzname = z.B. `nvme2n1`, nicht `/dev/nvme2n1`. Default-Wipe-
+#       Methode FAST reicht, schreibt nur Schlüsselsektoren leer.)
+#       Damit triggert kein zukünftiger Boot mehr `halt_if_installed`.
 
 # 2) Worker-Config mit Patches generieren (sops exec-file dechiffriert
 #    secrets.yaml in einen tmp file, kein plaintext auf Disk):
@@ -173,9 +212,9 @@ sed -n '/^kind: HostnameConfig$/,/^---$/p' /tmp/ms-a2-01.yaml
 grep -n -E "hostname:|disk:|wipe:|image:|interface:|homelab.local|node.kubernetes.io" /tmp/ms-a2-01.yaml
 #    Erwartet:
 #      hostname: ms-a2-01
-#      install.disk: /dev/sdb
+#      install.disk: /dev/sda
 #      install.wipe: true
-#      install.image: factory.../v1.13.2 (passend zur schematics.yaml)
+#      install.image: factory.../v1.13.x (passend zur schematics.yaml)
 #      interface: enp3s0
 #      nodeLabels: homelab.local/{ceph-osd,llm-capable,scratch-nvme}
 #                  + node.kubernetes.io/role: worker
@@ -183,7 +222,7 @@ grep -n -E "hostname:|disk:|wipe:|image:|interface:|homelab.local|node.kubernete
 # 4) Apply ans Maintenance-Mode-API:
 talosctl apply-config --insecure -n 192.168.47.39 -e 192.168.47.39 \
     --file /tmp/ms-a2-01.yaml
-#    → Talos installiert auf /dev/sdb (wipe vorab), rebootet
+#    → Talos installiert auf /dev/sda (wipe vorab), rebootet
 #    → Maintenance Mode endet, SanDisk-Boot-Stick darf raus
 
 # 5) Post-install verify (KEIN --insecure mehr, talosconfig benutzen):
@@ -192,7 +231,7 @@ kubectl --kubeconfig ./kubeconfig get nodes
 #    Erwartet: ms-a2-01 Ready, Labels:
 #      homelab.local/ceph-osd=true,
 #      homelab.local/llm-capable=false,
-#      homelab.local/scratch-nvme=false,
+#      homelab.local/scratch-nvme=true,
 #      node.kubernetes.io/role=worker
 #    Hinweis: IP kann sich nach Reboot ändern (neuer DHCP-Lease möglich)
 

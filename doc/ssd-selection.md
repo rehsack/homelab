@@ -162,3 +162,46 @@ UserVolume-Spec.
 - [Samsung 9100 PRO 4TB — Geizhals.de](https://geizhals.de/samsung-ssd-9100-pro-4tb-mz-vap4t0bw-a3427123.html)
 - [Lexar NM1090 PRO 4TB Review — Tom's Hardware](https://www.tomshardware.com/pc-components/ssds/lexar-nm1090-pro-4tb-ssd-review)
 - [WD Black SN7100 Review — Tom's Hardware](https://www.tomshardware.com/pc-components/ssds/wd-black-sn7100-ssd-review)
+
+---
+
+## Postskriptum — was tatsächlich gekauft / verbaut wurde (Juni 2026)
+
+Dieses Dokument war als Markt-Recherche für die geplante 3. interne NVMe
+(Yocto-Scratch) gedacht. In der praktischen Umsetzung sind zwei Sachen
+abweichend gelaufen:
+
+**Yocto-Scratch: gar nicht gekauft, sondern recycelt.** Die ex-NUC Samsung
+SSD 970 EVO Plus 2 TB (originally Boot-Disk der gescheiterten NUC-Reanimation,
+extern in einem USB-C-Gehäuse als ms-a2-01-Boot-Drive eingesetzt, dort
+wegen Bridge-Inkompatibilität gescheitert) ist in den 3. M.2-Slot intern
+verbaut. `disk.model = "Samsung SSD 970 EVO Plus 2TB"` matched die
+CEL-Negation `!= "Samsung SSD 990 PRO 4TB"` sauber — keine Architektur-
+Anpassung nötig. Der ganze 4-TB-Markt-Snapshot oben ist damit historische
+Referenz, brauchbar falls die 970 EVO Plus mal ausfällt und ein Neukauf ansteht.
+
+**Boot-Disk: gekauft, aber USB-C, nicht intern.** Nach zwei Bridge-Failures
+(ASMedia ASM2362-basierte Gehäuse, beide am USB4-Front-Port des MS-A2 in
+Disconnect-Loops gelaufen) wurde die Architektur auf eine UGREEN-USB-C-NVMe-
+Bridge (Modell 15512, RTL9210B-Chip, Gen 2x1) + SanDisk PLUS 250 GB Gen3
+NVMe gewechselt. ~€80 netto Gesamt. Verbaut am *rückseitigen* USB 3.2 Gen 2x1
+Port (NICHT am USB4 vorne — Mode-Negotiation-Komplexität umgangen). Läuft.
+
+**Bridge-Chip-Lehre für die Akten:**
+
+- **ASMedia ASM2362 / ASM2364**: auf AMD-Ryzen-USB4-Hosts (Fire Range / Phoenix /
+  Rembrandt) reproduzierbare USB4-Mode-Negotiation-Loops, Disconnect-Storm,
+  unbenutzbar. **Nicht kaufen** für Hosts mit USB4-Ports.
+- **ASMedia ASM2464PD** (USB4-nativ): laut egpu.io / Arch-Forums hat dieselbe
+  Linux-Compat-Problematik auf AMD-USB4-Hosts wie ASM2362. Premium-Preis,
+  keine Verbesserung. **Auch nicht kaufen** für AMD-USB4.
+- **JMicron JMS583**: chip-level mature, aber Board-/Kühl-Qualität variiert
+  (ICY BOX IB-1817M-C31 hatte hier zickige Connection/Lesefehler nach Wärme).
+- **Realtek RTL9210B** (Gen 2x1, 10 Gbps): empirisch stabil, in UGREEN-Gehäusen
+  bewährt. **Aktuelle Empfehlung** für USB-C-NVMe-Boot.
+
+**Marktkontext zum Zeitpunkt des Kaufs**: NAND-Preise im Q2 2026 in massiver
+Aufwärtsbewegung (Tom's Hardware: +246 % seit Q1/2025, +70 % in 60 Tagen,
+NAND-Kapazität wird in HBM für AI-GPUs umgeleitet). Forecast bis Ende 2027
+weiter steigend. Wenn ein erneuter Kauf ansteht, ist der Markt-Snapshot
+oben spätestens nach 4 Wochen obsolet — re-recherchieren auf Geizhals.
