@@ -403,8 +403,8 @@ ohne Buchhaltung in containerd.
 
 ### Eskalations-Stufen (least to most disruptive)
 
-**Stufe 1 — Reference-Removal + Force-Pull** (surgical, *funktioniert nicht
-immer*):
+**Stufe 1 — Reference-Removal + Force-Pull** (surgical Probe für ein einzelnes
+Image, *funktioniert nicht immer*):
 
 ```bash
 talosctl image remove <image:tag> -n <node>
@@ -415,11 +415,50 @@ talosctl image pull <image:tag> -n <node>
 Erwartung: wenn der Pull instant zurückkommt (z.B. <1s für 40 MB), ist der
 orphan Blob noch im Content-Store und containerd re-linked nur Tag+Digest auf
 denselben kaputten Bytes. Echte fresh-Download dauert proportional zur
-Image-Größe. **Wenn instant: zur Stufe 2.**
+Image-Größe. **Wenn instant: zur Stufe 2 — aber vorher batch-entwirren, siehe
+unten.**
 
 Ressourcen-Impact: keine. Risiko: keine.
 
+**Stufe 1b — Batch-Vorbereitung VOR dem Reboot** (wichtiger Schritt, sonst
+Reboot-Loop):
+
+Pull-Timestamps aller Images mit der Disk-Failure-Phase abgleichen. Verdächtig
+ist alles, dessen `CREATED`-Timestamp in der Failure-Phase liegt *oder kurz
+davor* (Layer-Extraktion bei großen Images kann mehrere Sekunden bis Minuten
+laufen und Failure-Window-Overlap erzeugen, auch wenn der Pull-Befehl vorher
+startete). Großes Image mit Pull-Start 2 Minuten vor Failure = wahrscheinlich
+mitten in der Extraktion zum Failure-Zeitpunkt → korrupt-verdächtig.
+
+```bash
+# Beispiel: Failure-Phase 11:42-12:07 → Verdächtig ist alles 11:39-12:10
+talosctl image ls -n <node> | awk '/T11:3[9]|T11:4[0-9]|T11:5[0-9]|T12:0[0-9]/ {print}'
+```
+
+Für JEDES verdächtige Image: Tag UND Digest entfernen. Loop dafür:
+
+```bash
+for ref in <image1:tag> <image2:tag> ... <image1>@<digest> <image2>@<digest> ...; do
+  talosctl image remove "$ref" -n <node>
+done
+```
+
+Verifikation per `talosctl image ls | grep <substring>` — sollte leer sein für
+alle behandelten Images. **Erst dann zur Stufe 2 (Reboot).** containerd's
+Boot-GC räumt *alle* unreferenzierten Blobs auf einmal weg, daher ein Reboot
+genügt für N Images, vorausgesetzt deren Refs sind vorher alle entfernt.
+
+Resourcen-Impact: keine (außer Tipparbeit). Risiko: keine. Wenn versehentlich
+auch ein *sauberes* Image entfernt wird, kostet das nur einen Re-Pull beim
+nächsten Pod-Schedule.
+
 **Stufe 2 — Node-Reboot, containerd-GC** (preserves /var/log, ~2 Min Pause):
+
+**Vorbedingung**: Stufe 1b (Batch-Reference-Removal aller Verdächtigen) muss
+durchgeführt sein. Sonst räumt der Reboot-GC nur die Blobs weg, deren
+Referenzen wir explizit entfernt haben — andere korrupte Layer bleiben
+unverändert und tauchen beim nächsten Pod-Schedule wieder als Failure auf =
+Reboot-Loop.
 
 ```bash
 talosctl reboot -n <node>
