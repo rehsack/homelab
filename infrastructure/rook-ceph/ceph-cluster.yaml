@@ -24,6 +24,14 @@ spec:
         devices:
           - name: nvme0n1
           - name: nvme1n1
+      - name: ms-a2-01
+        devices:
+          # Explicit per-disk list — do NOT switch to deviceFilter "^nvme",
+          # that would also catch /dev/nvme2n1 (the 970 EVO Plus, reserved
+          # as Yocto-scratch via UserVolumeConfig — see CLAUDE.md storage
+          # tiering).
+          - name: nvme0n1   # Samsung SSD 990 PRO 4TB (S7DPNU0Y715145B)
+          - name: nvme1n1   # Samsung SSD 990 PRO 4TB (S7DPNU0Y738012X)
   network:
     provider: host
   placement:
