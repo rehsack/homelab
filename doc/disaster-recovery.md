@@ -371,6 +371,115 @@ beide Repliken einer PG auf zwei OSDs *desselben* Hosts liegen — host-Verlust
 würde dann beide treffen. Genau deshalb ist die Transition zu `host`-Domain
 *nicht* aufschiebbar, sobald MS-A2 läuft.
 
+## Operative Recovery — Container-Image-Cache-Korruption nach Disk-Failure
+
+**Szenario**: Eine vorübergehende Boot-Disk-Failure (z.B. USB-NVMe-Bridge zickt,
+sda4 in EIO, XFS-Recovery klärt Metadata aber Daten-Blöcke der OSI-Layer-Files
+sind partiell ungeschrieben) hinterlässt korrupte Container-Image-Blobs im
+containerd-Content-Store. Pods scheitern mit `exec format error` (ENOEXEC) oder
+sporadischem EIO beim Container-Start, *obwohl* dmesg keine neuen Disk-Errors
+mehr zeigt und der `image ls` das erwartete Image listet. Der `sha256`-Hash des
+Blobs stimmt im containerd-Index, weil der Hash beim Write-Time gegen Memory
+geprüft wurde — die später beobachtete Diskrepanz ist eine Block-Layer-Realität
+ohne Buchhaltung in containerd.
+
+**Diagnose-Schritte:**
+
+1. Pod-Container-Status anschauen — welche Container im Pod failen, welche laufen?
+   Wenn nur EIN Sidecar versagt (z.B. csi-snapshotter), während andere Container
+   im selben Pod laufen, ist es nicht "die ganze Image-Familie kaputt", sondern
+   ein einzelnes Image.
+
+2. Pull-Timestamp des verdächtigen Images vergleichen — Pull-Time in der bekannten
+   Disk-Failure-Phase ist die rauchende Pistole:
+   ```bash
+   talosctl image ls -n <node> | grep <image>
+   # Falls Pull-Zeitstempel mit Failure-Phase überlappt → korrupter Cache hochwahrscheinlich
+   ```
+
+3. Cross-Check gegen einen *gesunden* Node desselben Clusters — wenn dort dasselbe
+   Image (gleicher sha256) ohne Issues läuft, ist's definitiv ein Node-lokaler
+   Cache-Issue, nicht ein generelles Image-Problem.
+
+### Eskalations-Stufen (least to most disruptive)
+
+**Stufe 1 — Reference-Removal + Force-Pull** (surgical, *funktioniert nicht
+immer*):
+
+```bash
+talosctl image remove <image:tag> -n <node>
+talosctl image remove <image>@sha256:<digest> -n <node>
+talosctl image pull <image:tag> -n <node>
+```
+
+Erwartung: wenn der Pull instant zurückkommt (z.B. <1s für 40 MB), ist der
+orphan Blob noch im Content-Store und containerd re-linked nur Tag+Digest auf
+denselben kaputten Bytes. Echte fresh-Download dauert proportional zur
+Image-Größe. **Wenn instant: zur Stufe 2.**
+
+Ressourcen-Impact: keine. Risiko: keine.
+
+**Stufe 2 — Node-Reboot, containerd-GC** (preserves /var/log, ~2 Min Pause):
+
+```bash
+talosctl reboot -n <node>
+# warten ~60-90s bis node wieder Ready
+# nach Boot räumt containerd orphan Blobs per GC weg, fresh Pull beim
+# nächsten Pod-Schedule pullt echten neuen Content
+```
+
+Ressourcen-Impact: Node kurz NotReady, Pods werden anderswo rescheduled bzw.
+restartet beim Comeback. **`/var/log` bleibt erhalten** — wichtig für
+forensische Analyse späterer Incidents. Container-Image-Cache bleibt
+weitgehend erhalten (nur orphaned Blobs werden gepurgt).
+
+Risiko: gering. Wenn etwas anderes auf dem Node im selben Zustand corruption
+hat (z.B. weitere Layer mehrerer Images), würde ein Reboot diese nicht
+adressieren — dann eskalieren.
+
+`talosctl service containerd restart` als noch-leichtere Alternative ist
+**nicht verfügbar** (Talos-API: "service containerd doesn't support restart
+operation via API"). Reboot ist der billigste Weg, GC zu triggern.
+
+**Stufe 3 — EPHEMERAL-Wipe** (last resort, *verliert /var/log*):
+
+```bash
+talosctl reset --system-labels-to-wipe EPHEMERAL --reboot -n <node>
+```
+
+Was passiert:
+- `--graceful` (default): vorab cordon + drain
+- Talos schreibt Wipe-Direktive in META, rebootet
+- Boot-Sequence formatiert sda4 frisch (komplettes XFS), erzeugt leeres /var
+- Node kommt mit unveränderter Identity (Hostname, IP, K8s-Labels — alles in
+  STATE/META) zurück
+- kubelet pullt *alle* benötigten Images frisch nach (~5-15 Min je nach
+  Image-Volumen — typisch 2-3 GB für Rook-Ceph + Cilium + CSI-Familie)
+- Rook reconciled von selbst, OSD-prepare läuft mit sauberem State
+
+Was *nicht* passiert: keine Re-Provision, kein Re-Bootstrap, kein Manuelles
+Re-Apply. Cluster-State (etcd) ist unberührt. Internal NVMes (Ceph-OSDs,
+Yocto-Scratch) sind nicht auf sda → unberührt.
+
+Ressourcen-Impact: Node ~10 Min NotReady, ~3 GB Image-Re-Downloads, /var/log
+weg (deshalb last resort — Logs sind in einer Folge-Inzident-Analyse wertvoll).
+
+Risiko: gering (cluster-state bleibt komplett), aber **verlierst die
+forensische Spur** zum Original-Incident. Wenn die Disk-Failure-Ursache nicht
+klar ist, BACKUP der relevanten /var/log-Dateien vor dem Wipe machen
+(via `talosctl read /var/log/<file>` oder rsync via Pod).
+
+### Vorbeugung
+
+- USB-Boot-Hardware mit *stabilen* Bridge-Chips wählen (siehe
+  `doc/ssd-selection.md` für die Bridge-Chip-Liste und die ASMedia-Falle auf
+  AMD-USB4-Hosts).
+- USB-Boot über *USB-A* statt USB-C, wo möglich — umgeht den USB-C/USB4-
+  Negotiation-Pfad mit weniger Failure-Modes.
+- Nach einem überstandenen Disk-Failure-Incident: *präventiv* die in dieser
+  Zeit gepullten Images auf alle Nodes erneuern (Stufe 1+2 dieser Doc), bevor
+  Pods sie das nächste Mal anfassen. Spart Diagnose-Zeit beim nächsten Mal.
+
 ## TODO (nach heute Abend, vor dem ersten realen Incident)
 
 - [ ] `talosctl etcd snapshot`-Automatisierung einrichten — Talos-Service oder
