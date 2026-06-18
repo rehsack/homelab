@@ -1,8 +1,10 @@
 machine:
   install:
-    image: factory.talos.dev/metal-installer/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588:v1.13.2
+    image: factory.talos.dev/metal-installer/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588:v1.13.4
     disk: /dev/sda
     wipe: true
+  kubelet:
+    image: ghcr.io/siderolabs/kubelet:v1.36.1
   network:
     interfaces:
       - interface: enp3s0

@@ -1,10 +1,14 @@
 machine:
   install:
-    image: factory.talos.dev/metal-installer/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588:v1.13.0
+    image: factory.talos.dev/metal-installer/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588:v1.13.4
     disk: /dev/sda
     wipe: true
+  kubelet:
+    image: ghcr.io/siderolabs/kubelet:v1.36.1
   network:
-    hostname: f5a-01
+    # hostname set via separate HostnameConfig doc (f5a-01-hostname.yaml) —
+    # machine.network.hostname conflicts with the auto-generated HostnameConfig
+    # (siderolabs/talos#12573); see doc/disaster-recovery.md for the sed workaround.
     interfaces:
       - interface: enp197s0
         dhcp: true
@@ -12,6 +16,9 @@ machine:
           ip: 192.168.47.240
   nodeLabels:
     node.kubernetes.io/role: controlplane-worker
+    homelab.local/ceph-osd: "true"
+    homelab.local/scratch-nvme: "false"
+    homelab.local/llm-capable: "true"
   sysctls:
     vm.dirty_ratio: "10"
     vm.dirty_background_ratio: "5"
