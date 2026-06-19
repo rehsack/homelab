@@ -1,4 +1,4 @@
-# cilium-patch.yaml
+# homelab-cilium.yaml
 cluster:
   network:
     cni:

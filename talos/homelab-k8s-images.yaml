@@ -13,10 +13,10 @@
 # To bump Kubernetes: change the tags here, commit, re-apply — the diff is the
 # upgrade record. No node reboot needed for a pure k8s-component bump (static
 # pods + kubelet restart in place); the OS/extension version is bumped
-# separately via talos/schematics.yaml + `talosctl upgrade`.
+# separately via the node's talos/<node>-schematics.yaml + `talosctl upgrade`.
 #
 # kube-proxy is intentionally absent: Cilium runs kube-proxy replacement
-# (cluster.proxy.disabled=true in cilium-patch.yaml).
+# (cluster.proxy.disabled=true in homelab-cilium.yaml).
 cluster:
   apiServer:
     image: registry.k8s.io/kube-apiserver:v1.36.1

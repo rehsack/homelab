@@ -121,7 +121,7 @@ new hardware.
 ```
 homelab/
 ├── talos/              # Talos machine configs, patches, secrets, schematics — NOT applied via kubectl
-│   └── schematics.yaml # Image Factory schematic IDs and extensions per node
+│   └── <node>-schematics.yaml # Image Factory schematic IDs/extensions per node
 ├── infrastructure/     # Cluster infrastructure (storage, networking)
 │   ├── rook-ceph/      # Rook-Ceph operator, CephCluster, StorageClass
 │   └── cilium-lb/          # LB-IPAM pool + L2 announcement policy
@@ -137,7 +137,7 @@ homelab/
 - **StorageClass**: Always `rook-cephfs` for PVCs.
 - **Secrets**: Real values in YAML, field-level encrypted via SOPS+age. Edit with `sops <file>`, decrypt with `sops -d <file>`.
 - **Namespaces**: `soho` for business/SOHO workloads (Forgejo, CI). Future: per-customer namespaces for VPN isolation.
-- **Talos upgrades**: Always use the per-node Image Factory installer from `talos/schematics.yaml`, never the generic `ghcr.io/siderolabs/installer`. This preserves extensions and the schematic ID in META.
+- **Talos upgrades**: Always use the per-node Image Factory installer from the node's `talos/<node>-schematics.yaml`, never the generic `ghcr.io/siderolabs/installer`. This preserves extensions and the schematic ID in META.
 - **Node labels for storage tiering**: every node declares its resource-capability
   axes via three boolean `homelab.local/*` labels set in its MachineConfig
   `nodeLabels`. This makes the per-disk storage tiering visible from the K8s API

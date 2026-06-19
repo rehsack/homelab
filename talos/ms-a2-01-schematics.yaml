@@ -1,7 +1,8 @@
 # Talos Image Factory Schematic — ms-a2-01
 # https://factory.talos.dev
 #
-# Per-node schematic (extracted from talos/schematics.yaml).
+# Per-node schematic (sibling of talos/f5a-01-schematics.yaml; the monolithic
+# talos/schematics.yaml was split per node).
 #
 # ms-a2-01 needs a kernel arg to force BOT on the RTL9210 USB-NVMe boot bridge.
 # The bridge's UAS path throws a reset-storm that kills /var (EIO) → containerd

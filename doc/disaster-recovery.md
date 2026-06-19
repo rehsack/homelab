@@ -46,18 +46,21 @@ Diese Runbooks dienen zwei Zwecken:
 1. **Initialer Bring-up** eines Knotens vom Image-Factory-USB-Stick aus.
 2. **Re-Provisionierung** nach Hardware-Tausch oder als Teil eines Recovery-Pfads.
 
-Voraussetzungen wie oben. Schematic-IDs sind in `talos/schematics.yaml` gepinnt;
-das identische Schematic auf zwei Nodes ergibt denselben Hash (content-addressed).
+Voraussetzungen wie oben. Schematic-IDs sind per-node in
+`talos/<node>-schematics.yaml` gepinnt; gleiche Extension-Sets ergeben denselben
+Hash (content-addressed), divergieren aber, sobald ein Node eigene Kernel-Args
+braucht (z.B. ms-a2-01 mit dem `usb-storage`-UAS-Quirk für die RTL9210-Bridge).
 
 ### f5a-01 (Control Plane, single-node Cluster-Init)
 
 **Hardware**: Acemagic F5A (AMD HX370). Boot vom externen USB-C-SSD
 (Pyrite 2400, 512 GB). NIC `enp197s0` am Switch.
 
-**Patches**: `talos/patch-machine.yaml`, `talos/patch-volumes.yaml`,
-`talos/patch-cluster.yaml`, `talos/cilium-patch.yaml`.
+**Patches**: `talos/f5a-01-machine.yaml`, `talos/f5a-01-volumes.yaml`,
+`talos/homelab-endpoint.yaml`, `talos/homelab-k8s-images.yaml` (CP-only),
+`talos/homelab-cilium.yaml`.
 
-**Schematic**: `talos/schematics.yaml` → `f5a-01`.
+**Schematic**: `talos/f5a-01-schematics.yaml`.
 
 ```bash
 # 0) USB-Stick mit der Factory-ISO am F5A booten, Maintenance Mode verifizieren:
@@ -77,10 +80,11 @@ sops exec-file talos/secrets.yaml \
         --with-secrets {} \
         --output-types controlplane \
         --output /tmp/f5a-01.yaml \
-        --config-patch @talos/cilium-patch.yaml \
-        --config-patch @talos/patch-machine.yaml \
-        --config-patch @talos/patch-volumes.yaml \
-        --config-patch @talos/patch-cluster.yaml \
+        --config-patch @talos/homelab-cilium.yaml \
+        --config-patch @talos/f5a-01-machine.yaml \
+        --config-patch @talos/f5a-01-volumes.yaml \
+        --config-patch @talos/homelab-endpoint.yaml \
+        --config-patch @talos/homelab-k8s-images.yaml \
         --force'
 
 # 3) Sanity-Check vor Apply (kritische Felder verifizieren):
@@ -100,10 +104,11 @@ talosctl kubeconfig -n <F5A-IP> ./kubeconfig
 talosctl --talosconfig talos/talosconfig.yaml config endpoint <F5A-IP>
 talosctl --talosconfig talos/talosconfig.yaml config node <F5A-IP>
 
-# 7) Generierte Config SOPS-encrypten und committen:
-sops -e -i /tmp/f5a-01.yaml
-mv /tmp/f5a-01.yaml talos/controlplane.yaml
-git add talos/controlplane.yaml talos/secrets.yaml talos/talosconfig.yaml
+# 7) Die generierte Config wird NICHT committet (regenerierbar aus secrets +
+#    Patches). Optional als lokale Referenz nach talos/.gen/ (gitignored):
+mv /tmp/f5a-01.yaml talos/.gen/controlplane.yaml
+#    Committet werden nur die Quellen:
+git add talos/secrets.yaml talos/talosconfig.yaml
 ```
 
 Danach (separate Runbooks): Cilium installieren, dann Rook-Ceph,
@@ -121,10 +126,11 @@ NIC `enp3s0` am Switch.
 Port-Wechsel testen, falls dmesg-Disconnects am Bildschirm sichtbar).
 
 **Patches**: `talos/ms-a2-01-machine.yaml`, `talos/ms-a2-01-hostname.yaml`,
-`talos/ms-a2-01-volumes.yaml`, `talos/cilium-patch.yaml`.
+`talos/ms-a2-01-volumes.yaml`, `talos/homelab-cilium.yaml`.
 
-**Schematic**: `talos/schematics.yaml` → `ms-a2-01` (identischer Hash wie
-f5a-01 dank content-addressing — gleiche Extension-Set).
+**Schematic**: `talos/ms-a2-01-schematics.yaml` (eigener Hash —
+`usb-storage.quirks=0bda:9210:u` für die RTL9210-Boot-Bridge, weicht damit
+bewusst von f5a-01 ab; nicht mehr derselbe content-addressed Hash).
 
 ```bash
 # 0) USB-Stick mit der Factory-ISO am MS-A2 booten, Maintenance Mode verifizieren:
@@ -184,7 +190,7 @@ sops exec-file talos/secrets.yaml \
         --with-secrets {} \
         --output-types worker \
         --output /tmp/ms-a2-01.yaml \
-        --config-patch @talos/cilium-patch.yaml \
+        --config-patch @talos/homelab-cilium.yaml \
         --config-patch @talos/ms-a2-01-machine.yaml \
         --config-patch @talos/ms-a2-01-hostname.yaml \
         --config-patch @talos/ms-a2-01-volumes.yaml \
@@ -214,7 +220,7 @@ grep -n -E "hostname:|disk:|wipe:|image:|interface:|homelab.local|node.kubernete
 #      hostname: ms-a2-01
 #      install.disk: /dev/sda
 #      install.wipe: true
-#      install.image: factory.../v1.13.x (passend zur schematics.yaml)
+#      install.image: factory.../v1.13.x (passend zum ms-a2-01-schematics.yaml)
 #      interface: enp3s0
 #      nodeLabels: homelab.local/{ceph-osd,llm-capable,scratch-nvme}
 #                  + node.kubernetes.io/role: worker
@@ -235,10 +241,10 @@ kubectl --kubeconfig ./kubeconfig get nodes
 #      node.kubernetes.io/role=worker
 #    Hinweis: IP kann sich nach Reboot ändern (neuer DHCP-Lease möglich)
 
-# 6) Generierte Config SOPS-encrypten und committen:
-sops -e -i /tmp/ms-a2-01.yaml
-mv /tmp/ms-a2-01.yaml talos/ms-a2-01.yaml
-git add talos/ms-a2-01.yaml
+# 6) Die generierte Config wird NICHT committet (regenerierbar aus secrets +
+#    Patches). Optional als lokale Referenz nach talos/.gen/ (gitignored):
+mv /tmp/ms-a2-01.yaml talos/.gen/ms-a2-01.yaml
+#    (keine neuen Quellen zu committen — secrets/talosconfig bestehen bereits)
 ```
 
 Danach (separate, nicht Teil dieses Runbooks):
@@ -303,7 +309,7 @@ talosctl gen config homelab https://192.168.47.39:6443 \
     --output-types controlplane
 
 # 3) MachineConfig anpassen (install-disk, hostname, schematic-installer),
-#    Vorlage: talos/ms-a2-01.yaml (worker-Variante), Typ auf controlplane
+#    Vorlage: die ms-a2-01-Patches (worker-Variante), Typ auf controlplane
 #    umstellen.
 
 # 4) Apply + Bootstrap:

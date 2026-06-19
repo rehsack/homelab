@@ -12,3 +12,6 @@ keys.txt
 
 # direnv (project-local env, contains SOPS_AGE_KEY_FILE path)
 .envrc
+
+# generated talos configs (regenerated from sources, not versioned)
+/talos/.gen/

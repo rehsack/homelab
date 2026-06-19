@@ -31,10 +31,13 @@ export SOPS_AGE_KEY_FILE=~/.config/sops/age/homelab.txt
 | Datei | Verschlüsselte Felder |
 |---|---|
 | `talos/secrets.yaml` | `id`, `secret`, `bootstraptoken`, `secretboxencryptionsecret`, `token`, `crt`, `key` |
-| `talos/controlplane.yaml` | `token`, `secret`, `id`, `secretboxEncryptionSecret`, `crt`, `key` |
-| `talos/worker.yaml` | `token`, `secret`, `id`, `crt`, `key` |
 | `talos/talosconfig.yaml` | `ca`, `crt`, `key` |
 | `applications/forgejo/forgejo-secret.yaml` | alle Werte unter `stringData` |
+
+> Die gerenderten Voll-Configs (`controlplane.yaml` / `<node>.yaml`) werden
+> **nicht** versioniert — sie liegen lokal in `talos/.gen/` (gitignored).
+> Secrets-Quelle ist `talos/secrets.yaml`; `gen config` rendert sie via
+> `sops exec-file` in die generierte Config.
 
 ## Täglicher Umgang
 
@@ -42,8 +45,8 @@ export SOPS_AGE_KEY_FILE=~/.config/sops/age/homelab.txt
 # Secret-Datei im Editor bearbeiten (entschlüsselt, verschlüsselt beim Speichern)
 sops talos/secrets.yaml
 
-# Klartext auf stdout (für Scripting, z.B. talosctl apply-config)
-sops -d talos/controlplane.yaml
+# Klartext auf stdout (z.B. zum Inspizieren der Secrets-Quelle)
+sops -d talos/secrets.yaml
 
 # talosconfig entschlüsseln für talosctl
 sops -d talos/talosconfig.yaml > ~/.talos/config
