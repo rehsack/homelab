@@ -1,0 +1,45 @@
+# Talos Image Factory Schematic — ms-a2-01
+# https://factory.talos.dev
+#
+# Per-node schematic (extracted from talos/schematics.yaml).
+#
+# ms-a2-01 needs a kernel arg to force BOT on the RTL9210 USB-NVMe boot bridge.
+# The bridge's UAS path throws a reset-storm that kills /var (EIO) → containerd
+# state unreadable → node NotReady. Under SDBoot (no SecureBoot) the kernel
+# cmdline lives inside the UKI, so the arg MUST be baked into the schematic —
+# machine.install.extraKernelArgs is IGNORED there (Talos warns: "extra kernel
+# arguments are not supported when booting using SDBoot").
+#
+# The schematic ID is content-addressed: adding extraKernelArgs changes the
+# hash, so it no longer matches f5a-01 and MUST be regenerated (see below).
+
+nodes:
+  ms-a2-01:
+    description: Minisforum MS-A2 (AMD Ryzen 9 9955HX, Zen 5 Fire Range, no XDNA NPU)
+    extensions:
+      - siderolabs/amd-ucode
+      - siderolabs/amdgpu
+      - siderolabs/iscsi-tools
+      - siderolabs/nvme-cli
+      - siderolabs/util-linux-tools
+    extra_kernel_args:
+      - usb-storage.quirks=0bda:9210:u   # RTL9210 bridge → force BOT, disable UAS
+    schematic: 999725387a6d9ec674b3a0985e84f063eeab6e3f3e8da22274f78b7fc6a19322
+    install_image: factory.talos.dev/metal-installer/999725387a6d9ec674b3a0985e84f063eeab6e3f3e8da22274f78b7fc6a19322:v1.13.4
+    boot_iso: factory.talos.dev/image/999725387a6d9ec674b3a0985e84f063eeab6e3f3e8da22274f78b7fc6a19322/v1.13.4/metal-amd64.iso
+
+# Regenerate the schematic ID by POSTing the Image Factory schematic below and
+# reading back `.id`, then fill schematic/install_image/boot_iso with <NEW_ID>:
+#
+#   curl -sX POST --data-binary @- https://factory.talos.dev/schematics <<'EOF'
+#   customization:
+#     systemExtensions:
+#       officialExtensions:
+#         - siderolabs/amd-ucode
+#         - siderolabs/amdgpu
+#         - siderolabs/iscsi-tools
+#         - siderolabs/nvme-cli
+#         - siderolabs/util-linux-tools
+#     extraKernelArgs:
+#       - usb-storage.quirks=0bda:9210:u
+#   EOF

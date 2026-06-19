@@ -17,16 +17,3 @@ nodes:
       - siderolabs/util-linux-tools
     install_image: factory.talos.dev/metal-installer/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588:v1.13.4
     boot_iso: factory.talos.dev/image/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588/v1.13.4/metal-amd64.iso
-
-  ms-a2-01:
-    description: Minisforum MS-A2 (AMD Ryzen 9 9955HX, Zen 5 Fire Range, no XDNA NPU)
-    # Same extension set as f5a-01 → identical schematic ID (content-addressed)
-    schematic: fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588
-    extensions:
-      - siderolabs/amd-ucode
-      - siderolabs/amdgpu
-      - siderolabs/iscsi-tools
-      - siderolabs/nvme-cli
-      - siderolabs/util-linux-tools
-    install_image: factory.talos.dev/metal-installer/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588:v1.13.4
-    boot_iso: factory.talos.dev/image/fa12d1c653f6b32d040a132c841e00a99aeb5a54f8c2a9880f3e3081a5e89588/v1.13.4/metal-amd64.iso
