@@ -18,8 +18,34 @@ spec:
       containers:
         - name: rook-ceph-tools
           image: quay.io/ceph/ceph:v19.2.4
-          command: ["/bin/bash", "-c", "sleep infinity"]
+          # Assemble ceph.conf + admin keyring from the rook-provided mon host
+          # and admin secret (via env), then idle. /etc/ceph must be a writable
+          # emptyDir — projecting the secrets straight onto it is read-only AND
+          # ceph needs an assembled ceph.conf, not raw files (conf_read_file).
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              cat > /etc/ceph/ceph.conf <<EOF
+              [global]
+              mon_host = ${ROOK_CEPH_MON_HOST}
+
+              [client.admin]
+              keyring = /etc/ceph/keyring
+              EOF
+              cat > /etc/ceph/keyring <<EOF
+              [${ROOK_CEPH_USERNAME}]
+              key = ${ROOK_CEPH_SECRET}
+              EOF
+              chmod 600 /etc/ceph/keyring
+              exec sleep infinity
           env:
+            - name: ROOK_CEPH_MON_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: rook-ceph-config
+                  key: mon_host
             - name: ROOK_CEPH_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -35,15 +61,4 @@ spec:
               name: ceph-config
       volumes:
         - name: ceph-config
-          projected:
-            sources:
-              - configMap:
-                  name: rook-ceph-mon-endpoints
-                  items:
-                    - key: data
-                      path: mon_host
-              - secret:
-                  name: rook-ceph-mon
-                  items:
-                    - key: ceph-secret
-                      path: keyring
+          emptyDir: {}
