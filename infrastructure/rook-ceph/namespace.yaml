@@ -1,0 +1,14 @@
+# namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rook-ceph
+  labels:
+    # Rook daemons (mon/osd/mgr) require hostPath, hostNetwork and privileged
+    # containers — they can never satisfy the "restricted" PSA profile. Scope
+    # the whole namespace to "privileged" on all three PSA modes. enforce was
+    # already set out-of-band; warn/audit fell back to the cluster-default
+    # "restricted", which is what produced the warning flood on apply.
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/audit: privileged
