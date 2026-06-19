@@ -23,6 +23,13 @@ Single-node Talos Linux cluster on Acemagic F5A (AMD HX370, 96GB RAM), expanding
 - **Talos 1.13 enables CDI by default**; extension services can drop CDI specs under
   /run/cdi. This is the path for exposing the AMD iGPU/NPU to LLM pods (llama.cpp +
   ROCm/Vulkan) on HX-class nodes. Kernel is now 6.18.x (good for recent amdgpu).
+- **f5a-01 LLM paths (HX 370)** — two independent options, see `doc/amd-npu.md`:
+  - *iGPU/Vulkan* (Radeon 890M, `gfx1150`): works today, `amdgpu` bound,
+    `/dev/dri/renderD128` + KFD compute node present. No kernel change needed.
+  - *NPU/FastFlowLM* (XDNA2, Strix Point, PCI `1022:17f0`): one kernel-config flip
+    away. Firmware (`amdnpu/17f0_10`) ships in the Talos base, XRT userspace runs
+    in the FLM container — but `amdxdna.ko` is NOT built (`CONFIG_DRM_ACCEL_AMDXDNA`
+    unset). XDNA2 is the FastFlowLM-supported tier; XDNA1 (Phoenix, PCI `1502`) is not.
 
 ### Secrets Management
 
@@ -146,7 +153,10 @@ homelab/
   remains TBD per the OPEN TENSION above.
   - `homelab.local/ceph-osd`: node hosts Ceph OSDs (persistent storage)
   - `homelab.local/scratch-nvme`: node has dedicated local volatile NVMe
-  - `homelab.local/llm-capable`: NPU + adequate iGPU/memory bandwidth for inference
+  - `homelab.local/llm-capable`: usable LLM inference path (iGPU and/or NPU). On
+    f5a-01 this is the Radeon 890M iGPU (Vulkan today) AND the XDNA2 NPU (one kernel
+    flip away via FastFlowLM); see `doc/amd-npu.md`. NOT NPU-gated — ms-a2/ser6 are
+    NPU-less. iGPU/memory-bandwidth alone qualifies.
   Current matrix (ceph-osd, scratch-nvme, llm-capable):
   f5a-01 = (true, false, true); ms-a2-01 = (true, true, false);
   ser6 = (false, true, false); ms-02 = tbd.
