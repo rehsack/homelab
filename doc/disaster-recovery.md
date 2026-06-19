@@ -141,10 +141,10 @@ talosctl get disks -n 192.168.47.39 -e 192.168.47.39 --insecure -o yaml
 #    Erwartet (siehe CLAUDE.md → Storage Tiering):
 #      nvme0n1, nvme1n1 = "Samsung SSD 990 PRO 4TB" (Ceph-OSDs, intern)
 #      nvme2n1          = "Samsung SSD 970 EVO Plus 2TB" (Yocto-Scratch,
-#                         3. interner M.2-Slot; UserVolumeConfig)
-#      sda              = "SSD Plus 250GB A" oder ähnlich
-#                         (UGREEN-USB-C-Gehäuse mit SanDisk PLUS 250 GB
-#                         NVMe, Install-Target)
+#                         3. interner M.2-Slot; UserVolumeConfig — Kühlkörper
+#                         GEKLEBT, bleibt intern, nie als USB-Boot umfunktionieren)
+#      sda              = "CT1000P5..." (Crucial P5 1TB im UGREEN-USB-C-Gehäuse
+#                         mit RTL9210B-Bridge, Install-Target)
 #      sdb              = "SanDisk 3.2Gen1" (Boot-Stick, USB-A)
 #
 #    Caveat 1: die Reihenfolge sda/sdb hängt von der USB-Enumeration ab.

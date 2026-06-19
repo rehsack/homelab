@@ -183,9 +183,16 @@ Referenz, brauchbar falls die 970 EVO Plus mal ausfällt und ein Neukauf ansteht
 **Boot-Disk: gekauft, aber USB-C, nicht intern.** Nach zwei Bridge-Failures
 (ASMedia ASM2362-basierte Gehäuse, beide am USB4-Front-Port des MS-A2 in
 Disconnect-Loops gelaufen) wurde die Architektur auf eine UGREEN-USB-C-NVMe-
-Bridge (Modell 15512, RTL9210B-Chip, Gen 2x1) + SanDisk PLUS 250 GB Gen3
-NVMe gewechselt. ~€80 netto Gesamt. Verbaut am *rückseitigen* USB 3.2 Gen 2x1
-Port (NICHT am USB4 vorne — Mode-Negotiation-Komplexität umgangen). Läuft.
+Bridge (Modell 15512, RTL9210B-Chip, Gen 2x1) gewechselt, verbaut am
+*rückseitigen* USB 3.2 Gen 2x1 Port (NICHT am USB4 vorne — Mode-Negotiation
+umgangen). Die erste NVMe darin, eine **SanDisk PLUS 250 GB Gen3, war DOA**
+(SCSI-Timeouts ~Sektor 332M, auf zweitem Host reproduziert → hardware-defekt,
+kein Host-Issue); ersetzt durch eine **Crucial P5 1 TB**.
+
+**SSD-Beschaffungs-Lehre für die Akten:** Finger weg von der Value-/PLUS-Klasse
+(SanDisk PLUS, Crucial BX, WD Green) für 24/7-Boot — DOA-/Frühausfall-Risiko ist
+statistisch real (kein Markenverriss). Und: **nicht bei Amazon** SSDs (nach-)
+bestellen — lieber Distri/Fachhandel mit sauberer RMA statt DOA-/Retouren-Theater.
 
 **Bridge-Chip-Lehre für die Akten:**
 
