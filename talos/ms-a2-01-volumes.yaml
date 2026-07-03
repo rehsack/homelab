@@ -4,3 +4,28 @@ name: EPHEMERAL
 provisioning:
   maxSize: 100GiB
   grow: false
+---
+# Local volatile scratch for build workloads (Yocto tmp/, SSTATE, OCI layers) —
+# see doc/arc42-homelab.adoc ADR-H-002 + LLM.md storage tiering. Dedicated NVMe,
+# NEVER a Ceph OSD, never mirrored. Mounts at /var/mnt/scratch.
+#
+# Selected by CEL on STABLE properties, so kernel enumeration order is irrelevant
+# across reboots (the whole point of ADR-H-002):
+#   - disk.transport == "nvme"  → excludes the USB-C boot SSD (/dev/sda = usb)
+#   - model "970 EVO Plus 2TB"  → the two Samsung 990 PRO 4TB (Ceph OSDs, managed
+#     raw by Rook) are a DIFFERENT model and are never matched here.
+# Only the uniquely-modelled 970 EVO Plus can match. wwid not needed (model is
+# unique; wwid would only be required to tell the two identical 990 PRO apart).
+#
+# NOTE (ADR-H-002): a diskSelector is applied only at first provisioning of an
+# empty disk. Re-selection later needs `talosctl wipe disk` first.
+apiVersion: v1alpha1
+kind: UserVolumeConfig
+name: scratch
+volumeType: partition
+provisioning:
+  diskSelector:
+    match: disk.transport == "nvme" && disk.model == "Samsung SSD 970 EVO Plus 2TB"
+  grow: true
+filesystem:
+  type: xfs
