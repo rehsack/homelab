@@ -22,12 +22,13 @@ nodes:
       - siderolabs/amdgpu
       - siderolabs/iscsi-tools
       - siderolabs/nvme-cli
+      - siderolabs/realtek-firmware
       - siderolabs/util-linux-tools
     extra_kernel_args:
       - usb-storage.quirks=0bda:9210:u   # RTL9210 bridge → force BOT, disable UAS
-    schematic: 999725387a6d9ec674b3a0985e84f063eeab6e3f3e8da22274f78b7fc6a19322
-    install_image: factory.talos.dev/metal-installer/999725387a6d9ec674b3a0985e84f063eeab6e3f3e8da22274f78b7fc6a19322:v1.13.4
-    boot_iso: factory.talos.dev/image/999725387a6d9ec674b3a0985e84f063eeab6e3f3e8da22274f78b7fc6a19322/v1.13.4/metal-amd64.iso
+    schematic: 76ba6863f04328e74266d078d7579d2e4423a6c5ac6dc105e9fff788048d3b0c
+    install_image: factory.talos.dev/metal-installer/76ba6863f04328e74266d078d7579d2e4423a6c5ac6dc105e9fff788048d3b0c:v1.13.5
+    boot_iso: factory.talos.dev/image/76ba6863f04328e74266d078d7579d2e4423a6c5ac6dc105e9fff788048d3b0c/v1.13.5/metal-amd64.iso
 
 # Regenerate the schematic ID by POSTing the Image Factory schematic below and
 # reading back `.id`, then fill schematic/install_image/boot_iso with <NEW_ID>:
@@ -40,7 +41,8 @@ nodes:
 #         - siderolabs/amdgpu
 #         - siderolabs/iscsi-tools
 #         - siderolabs/nvme-cli
+#         - siderolabs/realtek-firmware
 #         - siderolabs/util-linux-tools
-#     extraKernelArgs:
+#     extraKernelArgs:            # NOTE: sibling of systemExtensions, NOT nested under it
 #       - usb-storage.quirks=0bda:9210:u
 #   EOF

@@ -2,18 +2,26 @@
 
 ## Cluster Overview
 
-Single-node Talos Linux cluster on Acemagic F5A (AMD HX370, 96GB RAM), expanding to 3 nodes shortly.
+Two-node Talos Linux cluster (1 CP + 1 worker) on Acemagic F5A (AMD HX370, 96GB
+RAM) + Minisforum MS-A2, expanding to 3 nodes.
+
+> **Version currency rule**: The values below (Talos/K8s/Cilium versions, node
+> count, OSD count, endpoint, failure domain) are load-bearing operational facts,
+> NOT decoration. On EVERY component upgrade (e.g. the pending Talos 1.13.5) or
+> topology change, update this table and the affected sections in the SAME change
+> — never let CLAUDE.md drift behind reality. Verify against the live cluster
+> (`kubectl get nodes -o wide`, `ceph -s`, `talosctl version`) before editing.
 
 | Component       | Details                                                    |
 |-----------------|------------------------------------------------------------|
-| OS              | Talos Linux 1.13.2                                         |
-| Kubernetes      | 1.35.0                                                     |
+| OS              | Talos Linux 1.13.5                                         |
+| Kubernetes      | 1.36.2                                                     |
 | CNI             | Cilium 1.19.1 (kube-proxy replacement, WireGuard encryption, Hubble UI) |
-| Storage         | Rook-Ceph, 2× Samsung 990 PRO 4TB NVMe as OSDs            |
+| Storage         | Rook-Ceph, 4× Samsung 990 PRO 4TB NVMe as OSDs (2 per node)|
 | Filesystem      | CephFS, StorageClass `rook-cephfs`                         |
-| Ceph replication| `size: 2`, failure domain `osd` (transitions to `host` with Node 2) |
-| Node            | `f5a-01` at `192.168.47.40`                                |
-| Control Plane   | VIP `192.168.47.240` (active), endpoint `https://192.168.47.40:6443` (transitions to VIP with Node 2) |
+| Ceph replication| `size: 2`, failure domain `host` (transitioned from `osd` when ms-a2-01 joined) |
+| Nodes           | `f5a-01` at `192.168.47.40` (CP), `ms-a2-01` at `192.168.47.39` (worker) |
+| Control Plane   | VIP `192.168.47.240` (active), API endpoint `https://192.168.47.240:6443` (VIP now live on 1.13.4); single CP f5a-01 |
 | LoadBalancer    | Cilium LB-IPAM + L2 Announcements, pool `192.168.47.200-209` |
 | Ingress         | None yet                                                   |
 | Secrets         | SOPS + age (field-level encryption in Git); cluster-side decryption TBD |
@@ -90,9 +98,14 @@ mobility is an unresolved design point. Flag, don't silently violate.
   16C/32T, Radeon 610M iGPU, *no XDNA NPU*). Dual SO-DIMM DDR5-5600, 3× M.2
   PCIe 4.0 (manual warns: full bestückung → 2 of 3 throttle to Gen3 thermally;
   irrelevant for our workloads — Ceph is net-bound, Yocto is IOPS-bound, see
-  `doc/ssd-selection.md`). NICs verified on arrival: 2× Intel i226-V (`igc`,
-  enp3s0/enp4s0) + 2× Marvell AQC113C (`atlantic`, enp5s0f0np0/f1np1) — all
-  detected by stock 6.18 kernel, no driver extension needed.
+  `doc/ssd-selection.md`). NICs as enumerated on the live node (consecutive MACs
+  `38:05:25:36:7b:dd`–`7b:e0` → all onboard, no add-in card): `enp3s0` = Realtek
+  RTL8125B 2.5G (`r8169`) — the ACTIVE management link at `.39`; `enp4s0` = Intel
+  i226-V 2.5G (`igc`, down/uncabled); `enp5s0f0np0`/`enp5s0f1np1` = Intel X710
+  dual SFP+ 10G (`i40e`, down/uncabled). All four detected & driver-bound by the
+  stock 6.18 kernel, no driver extension needed. (Earlier notes claiming 2× i226-V
+  + 2× Marvell AQC113C `atlantic` were WRONG — this unit ships 1× Realtek + 1×
+  i226-V + 2× Intel X710. Verified from `talosctl get links` on 2026-07-03.)
   - **K8s role: worker** (NOT CP). Avoids the 2-node etcd quorum trap (where
     loss of either CP would freeze the cluster — 2 members need 2 votes to make
     progress). Promotion to CP happens in Phase 3 coordinated with SER6, going
@@ -105,8 +118,10 @@ mobility is an unresolved design point. Flag, don't silently violate.
   - **Compute role**: persistent workloads (Forgejo, PostgreSQL, SonarQube,
     Nexus, registries) + volatile builds (Yocto, OCI). *No LLM inference* —
     Fire Range has no NPU and the Radeon 610M iGPU is too weak.
-  - With Node 2 online: Ceph failure domain transitions `osd` → `host`.
-    Control plane endpoint stays at `.40` (no VIP transition, no 2-CP trap).
+  - With Node 2 online (DONE): Ceph failure domain transitioned `osd` → `host`.
+    Still a single CP (no 2-CP trap), but the API endpoint has since moved to the
+    VIP `192.168.47.240` — VIP proved stable across reboots on Talos 1.13.4 (the
+    single-node VIP resign bug was a 1.12.x issue, see Operational Notes).
 - **Phase 3: Beelink SER6 Pro** (Ryzen 7 7735HS, Zen3+, 32GB) — pure VOLATILE
   COMPUTE node (Yocto/OCI builds on local NVMe). Weak 680M iGPU → not an LLM
   node. Joins **together with promoting MS-A2 to CP** — 1→3 etcd in one
