@@ -200,6 +200,11 @@ kubectl get pods -A -w
 
 ## Operational Notes
 
+- **Cold-start acceptance test**: a node/infra change is *accepted* only after a
+  full power-cycle cold start — NOT the kexec that `talosctl upgrade`/`reboot` do
+  by default. Real test: `talosctl reboot --mode powercycle`, one node at a time
+  (scale CephFS workloads to 0 first on the mon node). Rationale + constraint →
+  arc42 Randbedingungen.
 - `talosctl disks` is deprecated — use `talosctl get disks/discoveredvolumes/systemdisk`.
 - `--insecure` flag required for `talosctl` in Maintenance Mode.
 - Talos install disk config uses `disk: /dev/sda`, not CEL expressions.

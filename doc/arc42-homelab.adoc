@@ -75,6 +75,16 @@ getrennt gehalten (siehe <<Risiken und technische Schulden>>).
   Wiederherstellungszeit von ~8 Tagen (Ausfall → Auswahl → Bestellung → Teil-Lieferungen
   → Aufbau → Ceph-Resync), siehe <<Risiken und technische Schulden>>.
 * Beschaffung optimiert auf *Cluster-Gesamtkosten*, nicht auf Einzelknoten-Effizienz.
+* *Kaltstart-Abnahme als Pflege-Constraint*: Änderungen an Knoten-/Infrastruktur-
+  Konfiguration gelten erst als abgenommen, wenn der Knoten einen vollständigen
+  *Kaltstart (Power-Cycle)* übersteht — nicht nur ein `kexec` (das `talosctl
+  upgrade`/`reboot` per Default nutzt und das weder Firmware/POST noch
+  Platten-Neuenumeration, USB-Bridge-Renegotiation oder VIP-Campaign aus kalt
+  prüft; echter Test: `talosctl reboot --mode powercycle`). Der regelmäßige
+  Kaltstart ist die empirische Probe auf Betriebsstabilität und stützt direkt
+  Qualitätsziel 1 (Reproduzierbarkeit / "cattle, not pets"). Bewährtes Prinzip
+  aus dem IBM-Labor Frankfurt/Main: was den regelmäßigen Kaltstart übersteht, ist
+  halbwegs betriebsstabil.
 
 == Kontextabgrenzung
 
