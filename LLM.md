@@ -68,34 +68,25 @@ RAM) + Minisforum MS-A2, expanding to 3 nodes.
 
 ## Storage Tiering: Persistent vs. Volatile (per-disk, not per-node)
 
-The cluster's core storage rule is NOT "storage nodes vs. compute nodes". It is:
+The rule and its mechanics live in `doc/arc42-homelab.adoc` (Ebene 2 + ADR-H-001
+for the per-disk boundary, ADR-H-002 for the full CEL `diskSelector` how-to).
+Operational essence:
 
-- **Persistent / CephFS-friendly**: Services with replicated state (Forgejo, Nexus,
-  PostgreSQL, SonarQube, registries). Live on Ceph OSDs.
-- **Volatile / CephFS-hostile**: Compile jobs (Yocto, OCI image builds) generate
-  millions of small temp files / hardlink churn — toxic to CephFS MDS and replication.
-  MUST live on LOCAL scratch storage, NEVER on Ceph. Never mirrored.
-- **Compute-heavy / CephFS-neutral**: LLM inference. Model weights are read-once from
-  Ceph (RWX, fine), then resident in RAM. Memory-bandwidth-bound, no persistent write.
-- **Disk selection for volumes uses CEL `diskSelector`** (Talos 1.13). Match the three
-  internal NVMe by stable properties — and ALWAYS scope with `disk.transport == "nvme"`
-  so the USB-C boot SSD (`/dev/sda`) can never be matched by an OSD or scratch selector.
-  Within the NVMe set: match by `disk.model` to separate the two Samsung 990 PRO (OSDs)
-  from the differently-modelled scratch NVMe; use `disk.serial`/`disk.wwid` to
-  distinguish the two identical 990 PRO from each other. Size constants need the
-  unsigned suffix `u` (e.g. `disk.size > 100u * GiB`). Inspect real values first with
-  `talosctl get disks -o yaml`.
+- **Persistent** (replicated state: Forgejo, PostgreSQL, Nexus, SonarQube,
+  registries) → Ceph OSDs. **Volatile** (Yocto/OCI build scratch — millions of
+  small files, hardlink churn, toxic to CephFS MDS) → LOCAL scratch NVMe, NEVER
+  Ceph, never mirrored. **LLM inference** → weights read-once from Ceph (RWX),
+  then RAM-resident; CephFS-neutral.
+- The boundary runs between DISKS, not machines: one node may host OSDs AND local
+  scratch, kept apart via CEL `diskSelector`. ALWAYS scope `disk.transport ==
+  "nvme"` so the USB-C boot SSD (`/dev/sda`) can't be matched. Inspect real values
+  first: `talosctl get disks -o yaml`.
+- Build artifacts are persisted by an EXPLICIT CI step (registry push), never by
+  an automatic cluster mechanism — the cluster never "knows" the volatile cache.
 
-KEY INSIGHT: This boundary runs between DISKS, not between MACHINES. A single node may
-host Ceph OSDs (persistent) AND a dedicated local NVMe (volatile scratch) simultaneously,
-as long as the disks are deterministically separated via CEL diskSelector. Build
-artifacts are persisted by an EXPLICIT CI step (push to registry) — never by an
-automatic cluster mechanism. The cluster never "knows" about the volatile cache.
-
-OPEN TENSION (to resolve when scheduling volatile workloads): a build pod needing the
-local scratch NVMe must land on the node that physically has it — which conflicts with
-the "No nodeSelector/nodeAffinity" rule in Conventions. Local-disk affinity vs. pod
-mobility is an unresolved design point. Flag, don't silently violate.
+**OPEN TENSION** (arc42 Risiken): a build pod needing the local scratch NVMe must
+land on the node that physically has it — conflicts with the no-nodeSelector/
+affinity rule. Unresolved; flag, don't silently violate.
 
 ## Node Expansion
 
@@ -169,12 +160,19 @@ homelab/
 
 ## Design Principles
 
-- **Cattle, not pets**: Every node re-provisionable from config. No manual state on nodes.
-- **Pod mobility**: Workloads must survive node rescheduling. Use LoadBalancer services (Cilium LB-IPAM), not NodePort.
-- **CNI before storage**: Cilium must be in place before Rook-Ceph. Never replace CNI while Ceph holds data.
-- **Boot drives ≠ Ceph OSDs**: Boot media is always separate from Ceph storage.
-- **Declarative**: All config in git. Secrets encrypted (SOPS+age). Target: `git clone` + age key + `sops -d | kubectl apply` = running cluster.
-- **CP topology is orthogonal to storage tiering**: a node's K8s role (control plane vs worker) is driven by etcd quorum needs (odd numbers, currently 1→3 jump), not by what disks it holds. Storage tiering rules apply equally to CP and worker nodes.
+Quality goals and headline constraints (cattle-not-pets, pod mobility,
+declarative/GitOps) live in `doc/arc42-homelab.adoc` (Qualitätsziele +
+Randbedingungen + Lösungsstrategie). The operational rules that aren't obvious
+from there:
+
+- **CNI before storage**: Cilium must be in place before Rook-Ceph. Never replace
+  the CNI while Ceph holds data.
+- **Boot drives ≠ Ceph OSDs**: boot media always separate from Ceph storage.
+- **Pod mobility is concrete**: use LoadBalancer services (Cilium LB-IPAM), not
+  NodePort; no nodeSelector/affinity on workloads (one OPEN TENSION, see above).
+- **CP topology is orthogonal to storage tiering**: a node's K8s role (CP vs
+  worker) is driven by etcd quorum (odd numbers, currently the 1→3 jump), not by
+  what disks it holds. Tiering rules apply equally to CP and worker nodes.
 
 ## Current Deployment Order
 
