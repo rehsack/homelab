@@ -153,7 +153,14 @@ homelab/
 
 ## Conventions
 
-- **Plain YAML manifests**, applied with `kubectl apply -f <directory>/`. No Helm, no Kustomize.
+- **Deployment mechanism per component type**:
+  - *Helm* for complex operator/CNI charts — **Cilium** (`infrastructure/cilium/`)
+    and **Rook-Ceph operator** (`infrastructure/rook-ceph/`), future Ingress. Chart
+    version pinned, `values.yaml` committed as SSOT; each dir's `README.md` carries
+    the exact `helm upgrade --install` command.
+  - *Plain YAML* (`kubectl apply -f <directory>/`) for our own CRs and config —
+    CephCluster/CephFilesystem/StorageClass, LB-IPAM pool, L2 policy, workloads.
+  - *Kustomize* is allowed where it earns its keep, not mandated.
 - **Labels**: Use `app.kubernetes.io/name`, `app.kubernetes.io/component`, `app.kubernetes.io/part-of`.
 - **No nodeSelector/nodeAffinity** on workloads — pods must be freely schedulable across nodes.
 - **StorageClass**: Always `rook-cephfs` for PVCs.

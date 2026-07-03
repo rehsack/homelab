@@ -1,0 +1,13 @@
+# Rook-Ceph operator Helm values — SSOT for the `rook-ceph` release
+# (namespace rook-ceph).
+#
+# Captured from the live cluster (`helm get values rook-ceph`) on 2026-07-03:
+# the release runs on chart DEFAULTS (user-supplied values were empty/null).
+# This file is intentionally (almost) empty — it exists to pin the fact that no
+# operator overrides are in effect, so `helm upgrade -f operator-values.yaml`
+# reproduces the running state exactly.
+#
+# The CephCluster / CephFilesystem / StorageClass / toolbox are NOT part of this
+# Helm release — they are plain-YAML CRs in this directory, applied with
+# `kubectl apply` AFTER the operator is up. See README.md.
+{}
