@@ -19,19 +19,20 @@ spec:
   storage:
     useAllNodes: false
     useAllDevices: false
+    # OSD disks are selected by their STABLE /dev/disk/by-id MODEL path, never the
+    # kernel enumeration name (nvme0n1) — those can reorder across a cold boot (they
+    # held over two cold boots in practice, but the name is incidental, not
+    # guaranteed). Matching by-id makes OSD selection reproducible, which is what
+    # matters for disaster recovery. The model string uniquely selects the two
+    # Samsung 990 PRO 4TB on each node and EXCLUDES the ms-a2-01 Yocto-scratch NVMe
+    # (Samsung 970 EVO Plus 2TB) and the USB-C boot SSD (a different model / usb).
+    # OSD disk serials (for reference):
+    #   f5a-01   : S7DPNJ0Y104547J, S7DPNJ0Y104559F
+    #   ms-a2-01 : S7DPNU0Y738012X, S7DPNU0Y715145B  (scratch 970 EVO = S4J4NG0M708735T, excluded)
+    devicePathFilter: "Samsung_SSD_990_PRO_4TB"
     nodes:
       - name: f5a-01
-        devices:
-          - name: nvme0n1
-          - name: nvme1n1
       - name: ms-a2-01
-        devices:
-          # Explicit per-disk list — do NOT switch to deviceFilter "^nvme",
-          # that would also catch /dev/nvme2n1 (the 970 EVO Plus, reserved
-          # as Yocto-scratch via UserVolumeConfig — see CLAUDE.md storage
-          # tiering).
-          - name: nvme0n1   # Samsung SSD 990 PRO 4TB (S7DPNU0Y715145B)
-          - name: nvme1n1   # Samsung SSD 990 PRO 4TB (S7DPNU0Y738012X)
   network:
     provider: host
   placement:
