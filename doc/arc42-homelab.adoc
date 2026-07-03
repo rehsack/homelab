@@ -64,7 +64,7 @@ getrennt gehalten (siehe <<Risiken und technische Schulden>>).
 | Randbedingung | Beschreibung
 | Immutable OS | Talos Linux — kein SSH, keine Shell; ausschließlich deklarative Konfiguration über die Talos-API.
 | Deklarativ / GitOps | Gesamter Cluster-Zustand in Git. Ziel: `git clone` + age-Key + `sops -d \| kubectl apply` = laufender Cluster.
-| Keine Bundles | Plain-YAML-Manifeste, kein Helm, kein Kustomize. Best-of-breed statt gebündelter Suiten.
+| Deployment-Mechanismus | Helm für komplexe Operator-/CNI-Charts (Cilium, Rook-Ceph, künftig Ingress) — Chart-Version gepinnt, Values als SSOT im Git. Plain-YAML (`kubectl apply`) für eigene CRs/Config. Kustomize erlaubt, wo es trägt. Best-of-breed statt gebündelter Suiten.
 | macOS als Ausnahme | Primäre Arbeitsumgebung ist macOS (Intel i9, Tahoe); als notwendige Ausnahme vom Linux-/Immutable-Prinzip akzeptiert.
 | Boot-Medium getrennt | Knoten booten von externer USB-C-SSD; interne NVMe bleiben für Ceph/Storage frei.
 |===
@@ -302,15 +302,23 @@ durch lokale NVMe-Bandbreite. +
 *Konsequenz*: Gen3-Anbindung der OSDs ist verschmerzbar, solange das Netz der Engpass
 ist (siehe ADR-H-006 / Risiken).
 
-=== ADR-H-005: Primäres Netzwerk-Interface des MS-A2 = Intel I226-V
+=== ADR-H-005: Primäres Netzwerk-Interface des MS-A2 = Realtek RTL8125
 
-*Status*: Akzeptiert. +
-*Entscheidung*: Von den zwei 2.5-GbE-Ports wird die Intel I226-V (`igc`) als
-Cluster-Interface genutzt, nicht die Realtek RTL8125 (`r8169`). Der Intel-Treiber ist
-der robustere. Die RTL8125 bleibt Reserve und ist als Pfad durch `f5a-01` ohnehin
-bereits als stabil nachgewiesen. +
-*Offen*: Deterministische Interface-Auswahl bei 4 NICs in der Talos-1.13-Config — die
-Selektor-Syntax ist *noch zu verifizieren* (siehe Risiken).
+*Status*: Akzeptiert (revidiert 2026-07-03; ursprünglich war die Intel I226-V
+vorgesehen). +
+*Kontext*: Zunächst war die Intel I226-V (`igc`) als robusterer Treiber geplant,
+Realtek als Reserve. In Betrieb genommen wurde jedoch die Realtek RTL8125
+(`enp3s0`, `r8169`, MAC `…7b:dd`) — und der DHCP-Fixlease `.39` in der FritzBox ist
+an genau diese MAC gebunden. Die *Schnittstelle definiert damit die IP*. +
+*Entscheidung*: Realtek bleibt primäres Cluster-Interface. Begründung: (a) beide
+Ports sind 2.5 GbE — kein Durchsatzunterschied; (b) die befürchtete
+r8169-Instabilität ist nicht eingetreten (stabil seit Inbetriebnahme, auf `f5a-01`
+ohnehin nachgewiesen); (c) ein Wechsel auf `igc` (`enp4s0`, MAC `…7b:de`) erforderte
+physisches Umstecken *und* Umbiegen des FritzBox-Fixlease auf die andere MAC —
+mittlerer Aufwand ohne Nutzen; (d) die zuvor fehlende r8169-Errata-Firmware liefert
+jetzt die `siderolabs/realtek-firmware`-Extension (im Node-Schematic gepinnt). +
+*Konsequenz*: Die Intel I226-V bleibt verkabelbare Reserve; die 10G-X710-Ports
+bleiben Zukunftsreserve (ADR-H-006). Kein Handgriff und kein FritzBox-Umbau nötig.
 
 === ADR-H-006: Netzwerk bleibt vorerst 1 GbE; 10G als geplante Reserve
 
@@ -352,7 +360,7 @@ kein Cluster-Storage-Knoten.
 | Risiko / Schuld | Beschreibung | Status / Gegenmaßnahme
 | `size:2`-Risikofenster | Ausgefallener OSD-Host → ~8 Tage nur eine Datenkopie. | Akzeptiert für Privatvergnügen. Mit Produktivlast: `size:3` (dritter OSD-Host) und/oder Backup *vorher*.
 | 1 GbE-Engpass | Ceph-Replikation/Recovery 1G-limitiert. | Bewusst vertagt (ADR-H-006). 10G-Reserve via X710 vorhanden.
-| Interface-Selektor (4 NICs) | Deterministische NIC-Auswahl in Talos 1.13 bei vier Interfaces *nicht verifiziert*. | OFFEN — vor MS-A2-Inbetriebnahme verifizieren.
+| Interface-Selektor (4 NICs) | Deterministische NIC-Auswahl bei vier Interfaces. | GELÖST — ms-a2-01 nutzt `enp3s0` per Interface-Name (ADR-H-005); Knoten in Betrieb.
 | GS2220-24 SFP+-Speed | Ob die SFP+-Slots echtes 10G liefern, ist *nicht verifiziert*. | OFFEN — bestimmt die Gangbarkeit des 10G-Pfads.
 | CEL-Test ausstehend | Drei-Platten-Trennung dokumentarisch belegt, praktisch noch nicht. | Wird auf MS-A2 (Knoten 2) verifiziert.
 | `nodeSelector`-Spannung | Build-Pod, der lokales Scratch braucht, muss auf genau diesen Knoten — Konflikt mit "keine `nodeAffinity`"-Regel. | OFFEN — Designpunkt lokales-Storage-Affinität vs. Pod-Mobilität.

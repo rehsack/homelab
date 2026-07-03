@@ -1,5 +1,17 @@
 # LLM.md — homelab Kubernetes Cluster
 
+> **Sources of truth — read these BEFORE reasoning or claiming anything about the
+> cluster.** This file is an operational quick-reference, NOT the authority on
+> architecture or deployed state. When a question touches either, open the actual
+> source first; do not reconstruct from memory or a partial read:
+> - **Architecture & the "why"** → `doc/arc42-homelab.adoc` (ADRs, quality goals,
+>   building-block view). Authoritative for design decisions.
+> - **Deployed node state** → `talos/<node>-machine.yaml`, `talos/homelab-*.yaml`
+>   patches, `talos/<node>-schematics.yaml`. Authoritative for what a node actually
+>   runs (install image, kubelet, NIC, labels, endpoint, k8s component images).
+> - **Live cluster** → `kubectl` / `talosctl get` / `ceph -s`. Ground truth; beats
+>   any doc when they disagree — then fix the doc.
+
 ## Cluster Overview
 
 Two-node Talos Linux cluster (1 CP + 1 worker) on Acemagic F5A (AMD HX370, 96GB
@@ -21,7 +33,7 @@ RAM) + Minisforum MS-A2, expanding to 3 nodes.
 | Filesystem      | CephFS, StorageClass `rook-cephfs`                         |
 | Ceph replication| `size: 2`, failure domain `host` (transitioned from `osd` when ms-a2-01 joined) |
 | Nodes           | `f5a-01` at `192.168.47.40` (CP), `ms-a2-01` at `192.168.47.39` (worker) |
-| Control Plane   | VIP `192.168.47.240` (active), API endpoint `https://192.168.47.240:6443` (VIP now live on 1.13.4); single CP f5a-01 |
+| Control Plane   | Single CP f5a-01. Canonical endpoint `https://192.168.47.40:6443` (SSOT: `talos/homelab-endpoint.yaml`). VIP `192.168.47.240` is configured on enp197s0 and usable as a client access path — but NOT promoted to the canonical endpoint until it survives a deliberate cold-start test (see Operational Notes) |
 | LoadBalancer    | Cilium LB-IPAM + L2 Announcements, pool `192.168.47.200-209` |
 | Ingress         | None yet                                                   |
 | Secrets         | SOPS + age (field-level encryption in Git); cluster-side decryption TBD |
@@ -87,56 +99,27 @@ mobility is an unresolved design point. Flag, don't silently violate.
 
 ## Node Expansion
 
-> **History note**: The original Phase 2 plan (Intel NUC6i7KYK as second OSD host)
-> is VOID. The NUC6i7KYK failed (dead display output, unclearable CMOS error,
-> no DHCP lease — retired to the "repair someday" pile, not scrap). Its two Samsung
-> 990 PRO 4TB drives were removed for reuse in the replacement node. This forced a
-> cleaner architecture (see "Storage Tiering" below): the per-node "storage vs.
-> compute" split was replaced by a per-disk "persistent vs. volatile" model.
+Full roster, hardware specs, and rationale (ADR-H-003…007, incl. the voided NUC
+plan) live in `doc/arc42-homelab.adoc` (Bausteinsicht Ebene 1 + ADRs). Only
+operational status + the bits not captured there:
 
-- **Phase 2 (active): Minisforum MS-A2** (Ryzen 9 9955HX, Zen 5 Fire Range,
-  16C/32T, Radeon 610M iGPU, *no XDNA NPU*). Dual SO-DIMM DDR5-5600, 3× M.2
-  PCIe 4.0 (manual warns: full bestückung → 2 of 3 throttle to Gen3 thermally;
-  irrelevant for our workloads — Ceph is net-bound, Yocto is IOPS-bound, see
-  `doc/ssd-selection.md`). NICs as enumerated on the live node (consecutive MACs
-  `38:05:25:36:7b:dd`–`7b:e0` → all onboard, no add-in card): `enp3s0` = Realtek
-  RTL8125B 2.5G (`r8169`) — the ACTIVE management link at `.39`; `enp4s0` = Intel
-  i226-V 2.5G (`igc`, down/uncabled); `enp5s0f0np0`/`enp5s0f1np1` = Intel X710
-  dual SFP+ 10G (`i40e`, down/uncabled). All four detected & driver-bound by the
-  stock 6.18 kernel, no driver extension needed. (Earlier notes claiming 2× i226-V
-  + 2× Marvell AQC113C `atlantic` were WRONG — this unit ships 1× Realtek + 1×
-  i226-V + 2× Intel X710. Verified from `talosctl get links` on 2026-07-03.)
-  - **K8s role: worker** (NOT CP). Avoids the 2-node etcd quorum trap (where
-    loss of either CP would freeze the cluster — 2 members need 2 votes to make
-    progress). Promotion to CP happens in Phase 3 coordinated with SER6, going
-    directly 1→3 etcd members in one step.
-  - **Storage role**: 2× Samsung 990 PRO 4TB (ex-NUC) as Ceph OSDs;
-    1× differently-modelled NVMe (TBD, next week) in the 3rd M.2 as LOCAL
-    volatile scratch (UserVolumeConfig, never a Ceph OSD). Boot from external
-    USB-C NVMe enclosure (ASMedia bridge): use the *non-USB4* Type-C port —
-    the USB4 port enters a renegotiation loop with this bridge chip.
-  - **Compute role**: persistent workloads (Forgejo, PostgreSQL, SonarQube,
-    Nexus, registries) + volatile builds (Yocto, OCI). *No LLM inference* —
-    Fire Range has no NPU and the Radeon 610M iGPU is too weak.
-  - With Node 2 online (DONE): Ceph failure domain transitioned `osd` → `host`.
-    Still a single CP (no 2-CP trap), but the API endpoint has since moved to the
-    VIP `192.168.47.240` — VIP proved stable across reboots on Talos 1.13.4 (the
-    single-node VIP resign bug was a 1.12.x issue, see Operational Notes).
-- **Phase 3: Beelink SER6 Pro** (Ryzen 7 7735HS, Zen3+, 32GB) — pure VOLATILE
-  COMPUTE node (Yocto/OCI builds on local NVMe). Weak 680M iGPU → not an LLM
-  node. Joins **together with promoting MS-A2 to CP** — 1→3 etcd in one
-  coordinated step, skipping the 2-node quorum trap. Control plane endpoint
-  transitions to VIP `192.168.47.240` once 3-CP topology is healthy.
-- **Phase 4 (tentative): Minisforum MS-02 Ultra** or successor — additional
-  Ceph OSDs toward `size: 3`. With 4-node topology the typical pattern is
-  3 CPs + 1 worker (etcd stays at 3, MS-02 joins as pure worker). POSSIBLE
-  second dual-purpose node IF the MS-A2 CEL per-disk separation proves stable
-  in practice. Bonus: boots from internal M.2, no USB-boot needed. Do NOT
-  plan around this until the MS-A2 setup proves itself.
+- **Phase 2 — MS-A2 (`ms-a2-01`): DONE.** Worker, not CP (avoids the 2-node etcd
+  quorum trap; CP promotion happens in Phase 3, 1→3 in one step). 2× 990 PRO as
+  OSDs; 3rd M.2 reserved for local volatile scratch (UserVolumeConfig, never a
+  Ceph OSD). Cluster NIC = Realtek `enp3s0` (ADR-H-005), DHCP fixlease `.39` bound
+  to its MAC. Boot: external USB-C NVMe (RTL9210 bridge) — use the *non-USB4*
+  Type-C port; the `usb-storage.quirks` kernel arg is pinned in
+  `talos/ms-a2-01-schematics.yaml` (USB4 port renegotiation-loops with the bridge).
+  Result: Ceph failure domain transitioned `osd` → `host`; still single CP
+  (endpoint/VIP status → Cluster Overview table).
+- **Phase 3 — SER6 Pro:** pending. Joins *together with* promoting MS-A2 to CP
+  (1→3 etcd in one step). Canonical endpoint moves to VIP `.240` once 3-CP is
+  healthy AND the VIP has passed a cold-start test.
+- **Phase 4 — MS-02 Ultra (tentative):** more OSDs toward `size: 3`. Don't plan
+  around it until the MS-A2 setup proves itself.
 
-**Disaster recovery**: see `doc/disaster-recovery.md` — MS-A2 can be promoted
-to CP under f5a-01 total failure; multiple paths documented, none requiring
-new hardware.
+**Disaster recovery**: `doc/disaster-recovery.md` — MS-A2 promotable to CP under
+f5a-01 total failure; no new hardware required.
 
 ## Repo Structure
 
