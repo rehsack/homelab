@@ -1,0 +1,75 @@
+= cubeSQL — database backend for MonKey Office (FiBu)
+
+cubeSQL (SQLabs) is the multi-user database server behind *MonKey Office Team*.
+It is used here as a helper to reduce the tax advisor's back-questions (mapping
+account movements to invoices, flagging mis-bookings) — *not* for the actual
+bookkeeping. The data is reproducible and loss-tolerant.
+
+Two seats: Kerstin & Jens → covered by the *free cubeSQL license* (up to 2
+concurrent connections). Clients connect from the desktop over the LAN.
+
+== Storage: block, not CephFS
+
+cubeSQL is a SQLite-based single-process server. A database wants a block device
+with proper locking/fsync semantics, so this app uses a *Ceph RBD* volume
+(`StorageClass rook-ceph-block`, RWO), NOT the default `rook-cephfs`. The block
+pool is defined in `infrastructure/rook-ceph/ceph-blockpool.yaml` and is purely
+additive to the existing OSD set (see its header).
+
+== Image
+
+`docker.io/joseluisq/cubesql` — a community image (no official one from SQLabs).
+The cubeSQL 5.9.6 binary is baked in at *build* time, so the pod is a plain
+pull-and-run. Upstream CI publishes only `:latest`, so **pin the digest** after
+the first pull (see the note in `deployment.yaml`).
+
+NOTE: the image bundles the proprietary cubeSQL binary — fine for a private pull
+into this cluster. Do not re-publish it publicly without clearing redistribution
+with SQLabs/ProSaldo first.
+
+== Deploy
+
+Order matters (pool/StorageClass before the PVC):
+
+[source,sh]
+----
+# 1) block pool + StorageClass (additive, size:2/host — watch HEALTH_OK)
+kubectl apply -f infrastructure/rook-ceph/ceph-blockpool.yaml
+
+# 2) the app (namespace soho already exists via forgejo)
+kubectl apply -f applications/cubesql/pvc.yaml
+kubectl apply -f applications/cubesql/deployment.yaml
+kubectl apply -f applications/cubesql/service.yaml
+
+# 3) find the assigned LoadBalancer IP
+kubectl -n soho get svc cubesql
+----
+
+== One-time bring-up (manual, human)
+
+. Request a *free license key* from the SQLabs website.
+. Install *cubeSQL Admin* (desktop), connect to the LoadBalancer IP on port
+  *4430*, and register the server with the free key. Registration persists in
+  `/data` (on the PVC), so it survives pod restarts.
+. **Change the default `admin`/`admin`** immediately — the server is on a
+  LoadBalancer.
+. Pin the running image digest into `deployment.yaml` (command in that file).
+
+== Follow-ups (not day-one)
+
+* Switch to SSL-only: uncomment `CUBESQL_SSL_ONLY=true` in `deployment.yaml`,
+  redeploy; connect MonKey Office with SSL.
+* Harden the pod to non-root (needs `/data` ownership via `fsGroup`).
+* Longer term: build an own image from the SQLabs binary + a Helm chart
+  (keep any binary-bearing image private).
+
+== Facts
+
+[cols="1,3"]
+|===
+| Port | 4430 (IANA default; `CUBESQL_PORT`)
+| Data | `/data` — settings, SQLite DBs, registration
+| License | free for up to 2 concurrent connections (= 2 seats)
+| Namespace | `soho`
+| Storage | `rook-ceph-block` (RBD, RWO, 10Gi, expandable)
+|===

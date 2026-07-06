@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cubesql
+  namespace: soho
+  labels:
+    app.kubernetes.io/name: cubesql
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: fibu
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate          # single RWO volume — never two pods mounting it at once
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cubesql
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cubesql
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: fibu
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000          # makes the RBD /data volume writable for uid 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cubesql
+          # Community image; the cubeSQL 5.9.6 binary is baked in at build time,
+          # so this is a plain pull-and-run (no runtime download).
+          # NOTE: upstream CI only publishes :latest — PIN THE DIGEST after the
+          # first pull for reproducibility:
+          #   kubectl -n soho get pod -l app.kubernetes.io/name=cubesql \
+          #     -o jsonpath='{.items[0].status.containerStatuses[0].imageID}'
+          # then replace the tag with  docker.io/joseluisq/cubesql@sha256:<digest>
+          image: docker.io/joseluisq/cubesql:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            # non-root (uid 1000, see pod securityContext) → restricted-PSA clean.
+            # If cubeSQL cannot write /data on first run, the fsGroup mount is the
+            # thing to check.
+          env:
+            - name: CUBESQL_PORT
+              value: "4430"
+            # Bring the server up PLAIN first to register the free license via
+            # cubeSQL Admin, THEN enable SSL-only and redeploy:
+            # - name: CUBESQL_SSL_ONLY
+            #   value: "true"
+          ports:
+            - name: cubesql
+              containerPort: 4430
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            tcpSocket:
+              port: 4430
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 4430
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: cubesql-data
