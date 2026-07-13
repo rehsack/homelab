@@ -1,0 +1,28 @@
+# Ephemeral helper tools — run on the WORKSTATION (Docker/Colima), never in the
+# cluster. Bring up only what you need, tear it down when done:
+#
+#   docker compose up cubesql-webadmin -d      # start one helper
+#   docker compose down                        # stop everything
+#
+# Helpers reach cluster services over the LAN via their LoadBalancer IPs
+# (192.168.47.200-209), not via kube-networking.
+name: homelab-helpers
+
+services:
+  # cubeSQL Web Admin — browser UI to administer the in-cluster cubeSQL server
+  # (register the free license, manage databases/backups, change admin/admin).
+  #   docker compose up cubesql-webadmin -d   ->   http://localhost:8080
+  # The server is the LoadBalancer IP of applications/cubesql (svc cubesql, :4430).
+  cubesql-webadmin:
+    image: jotools/cubesql-webadmin
+    environment:
+      TZ: Etc/UTC
+      CUBESQL_HOSTNAME: 192.168.47.201   # cubesql svc LoadBalancer IP (LAN)
+      CUBESQL_PORT: "4430"
+      CUBESQL_ENCRYPTION: AES256         # encrypt the connection (client-negotiated)
+      CUBESQL_USERNAME: admin
+      # No CUBESQL_PASSWORD on purpose — it lives in the password manager
+      # (Strongbox). The web admin prefills host/port/user; type the password at
+      # its login form. Keeps the secret out of git entirely.
+    ports:
+      - "8080:80"                        # web admin listens on :80 in-container
