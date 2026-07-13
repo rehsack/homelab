@@ -48,10 +48,16 @@ spec:
           env:
             - name: CUBESQL_PORT
               value: "4430"
-            # Bring the server up PLAIN first to register the free license via
-            # cubeSQL Admin, THEN enable SSL-only and redeploy:
-            # - name: CUBESQL_SSL_ONLY
-            #   value: "true"
+            # Transport encryption is client-negotiated per connection (cubeSQL:
+            # NONE / AES128 / AES256 / SSL). Our clients — MonKey Office and the
+            # helpers/ web admin — select AES256, so no server flag is needed.
+            # NOTE: cubeSQL CANNOT enforce a minimum encryption server-side (there
+            # is no "forbid NONE"); the only server-side enforcement is SSL-only
+            # (-q), which requires a certificate. SSL was declined (self-signed cert
+            # pain for a 2-seat in-house DB), so the server would still accept a
+            # plaintext client — access is bounded by the LAN + valid credentials.
+            # If enforcement is ever needed, restrict reachability at the network
+            # layer (CiliumNetworkPolicy on :4430) rather than adding a cert.
           ports:
             - name: cubesql
               containerPort: 4430

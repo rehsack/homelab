@@ -55,11 +55,21 @@ kubectl -n soho get svc cubesql
   LoadBalancer.
 . Pin the running image digest into `deployment.yaml` (command in that file).
 
+== Encryption
+
+Connection encryption is client-negotiated (cubeSQL: NONE / AES128 / AES256 /
+SSL). We use *AES256* on the clients — MonKey Office and the `helpers/` web admin
+(`CUBESQL_ENCRYPTION=AES256`). No server flag is involved.
+
+cubeSQL *cannot* enforce a minimum encryption server-side (there is no "forbid
+NONE"); the only server-side lever is SSL-only, which needs a certificate. SSL was
+declined (self-signed cert pain for a 2-seat in-house DB), so the server would
+still accept a plaintext client — access is bounded by the LAN + valid
+credentials. If enforcement is ever required, restrict reachability with a
+CiliumNetworkPolicy on `:4430` rather than adding a certificate.
+
 == Follow-ups (not day-one)
 
-* Switch to SSL-only: uncomment `CUBESQL_SSL_ONLY=true` in `deployment.yaml`,
-  redeploy; connect MonKey Office with SSL.
-* Harden the pod to non-root (needs `/data` ownership via `fsGroup`).
 * Longer term: build an own image from the SQLabs binary + a Helm chart
   (keep any binary-bearing image private).
 
@@ -70,6 +80,7 @@ kubectl -n soho get svc cubesql
 | Port | 4430 (IANA default; `CUBESQL_PORT`)
 | Data | `/data` — settings, SQLite DBs, registration
 | License | free for up to 2 concurrent connections (= 2 seats)
+| Encryption | client-negotiated AES256 (clients only; no server enforcement)
 | Namespace | `soho`
 | Storage | `rook-ceph-block` (RBD, RWO, 10Gi, expandable)
 |===
