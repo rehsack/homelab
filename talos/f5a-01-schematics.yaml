@@ -18,5 +18,5 @@ nodes:
       - siderolabs/nvme-cli
       - siderolabs/realtek-firmware
       - siderolabs/util-linux-tools
-    install_image: factory.talos.dev/metal-installer/eeff3d8f1ff6106f82f0c27c7be79d819ec1f6a084f80147a8fba4a6b156e292:v1.13.5
-    boot_iso: factory.talos.dev/image/eeff3d8f1ff6106f82f0c27c7be79d819ec1f6a084f80147a8fba4a6b156e292/v1.13.5/metal-amd64.iso
+    install_image: factory.talos.dev/metal-installer/eeff3d8f1ff6106f82f0c27c7be79d819ec1f6a084f80147a8fba4a6b156e292:v1.13.6
+    boot_iso: factory.talos.dev/image/eeff3d8f1ff6106f82f0c27c7be79d819ec1f6a084f80147a8fba4a6b156e292/v1.13.6/metal-amd64.iso

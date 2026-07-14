@@ -26,9 +26,9 @@ RAM) + Minisforum MS-A2, expanding to 3 nodes.
 
 | Component       | Details                                                    |
 |-----------------|------------------------------------------------------------|
-| OS              | Talos Linux 1.13.5                                         |
+| OS              | Talos Linux 1.13.6                                         |
 | Kubernetes      | 1.36.2                                                     |
-| CNI             | Cilium 1.19.1 (kube-proxy replacement, WireGuard encryption, Hubble UI) |
+| CNI             | Cilium 1.19.5 (kube-proxy replacement, WireGuard encryption, Hubble UI) |
 | Storage         | Rook-Ceph, 4× Samsung 990 PRO 4TB NVMe as OSDs (2 per node)|
 | Filesystem      | CephFS, StorageClass `rook-cephfs`                         |
 | Ceph replication| `size: 2`, failure domain `host` (transitioned from `osd` when ms-a2-01 joined) |

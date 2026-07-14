@@ -8,7 +8,7 @@
 # machines"). Workers pin only kubelet (in their machine patch). With a single
 # CP today this is one node; revisit when CP count grows in Phase 3.
 #
-# Versions match the Talos v1.13.5 defaults (verified via
+# Versions match the Talos v1.13.6 defaults (verified via
 #   talosctl image k8s-bundle --k8s-version v1.36.2 --etcd-version v3.6.12).
 # coreDNS/etcd are unchanged from 1.13.4; only the k8s components move to 1.36.2.
 # To bump Kubernetes: change the tags here, commit, re-apply — the diff is the
