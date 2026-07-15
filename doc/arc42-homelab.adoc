@@ -354,6 +354,38 @@ solange auf `f5a-01`. +
 SO-DIMM-Kriterium (verlöteter RAM) und kostet ein Vielfaches; sie ist eine eigene Liga,
 kein Cluster-Storage-Knoten.
 
+=== ADR-H-008: Upgrade-Hygiene — Currency-Sweep bei jedem Update-Trigger
+
+*Status*: Akzeptiert (2026-07-14). +
+*Kontext*: Die Komponenten (Talos, Kubernetes, Cilium, Rook, Ceph) haben
+*unabhängige* Release-Ströme. Wer nur reaktiv patcht, driftet unbemerkt und gerät
+in *Zugzwang* — durch auslaufenden Support (EOL), eine Sicherheitslücke oder einen
+Kompatibilitätsbruch, den man zu spät entdeckt. Leitsatz: *Wissen ist Macht* —
+Aktualitäts-Wissen erhält die *Selbstbestimmtheit* über das *Wann* eines Upgrades. +
+*Entscheidung*: Bei *jedem* Update-Trigger (gleich welcher Komponente) zuerst ein
+*Currency-Sweep* über *alle* gepinnten Komponenten (via `gh release list` gegen die
+Versionstabelle in CLAUDE.md/LLM.md als SSOT-Checklisten-Anker). Jeder Fund wird
+bewertet und *entschieden*: mitnehmen oder auf die Roadmap — nie ignorieren. +
+*Prüfkriterien* je Fund:
+
+* *Art*: Patch (gleiche Minor) / Minor / Major — bestimmt Risiko + Aufwand.
+* *Kompatibilität*: unterstützt die neue Version noch unser K8s / Ceph / Talos?
+  *Hartes Gate* bei K8s-*Minor*: Cilium *und* Rook vorher gegen die neue
+  K8s-Version prüfen.
+* *Sicherheit*: schließt sie eine für uns relevante CVE? → Priorität hoch.
+* *Relevante Bugfixes / gewünschte Features*: Zug-Faktor.
+* *Support-Fenster / EOL*: nähert sich unsere Version dem Support-Ende? →
+  priorisieren; das ist der eigentliche Selbstbestimmtheits-Hebel gegen Zugzwang.
+* *Disruption*: Reboots, CRD-Migrationen, Rollback-Pfad.
+
+*Entscheidungslogik*: kompatibler *Patch* → ins ohnehin anstehende Wartungsfenster
+mitnehmen (Effizienz). *Minor* → deliberat, mitnehmen *oder* Roadmap (ein Minor pro
+Schritt). *Major* → dedizierte Evaluierung + Roadmap. EOL-Nähe hebt die Priorität
+unabhängig von der Art. +
+*Konsequenzen*: Updates geschehen zu *unseren* Bedingungen, nicht unter Druck. Die
+Versionstabelle bleibt Pflicht-aktuell (Version-Currency-Rule); der Sweep ist Teil
+jedes Upgrade-Runbooks.
+
 == Qualitätsanforderungen
 
 === Qualitätsbaum (Auszug)

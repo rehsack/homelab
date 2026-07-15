@@ -140,7 +140,18 @@ homelab/
 - **StorageClass**: Always `rook-cephfs` for PVCs.
 - **Secrets**: Real values in YAML, field-level encrypted via SOPS+age. Edit with `sops <file>`, decrypt with `sops -d <file>`.
 - **Namespaces**: `soho` for business/SOHO workloads (Forgejo, CI). Future: per-customer namespaces for VPN isolation.
-- **Talos upgrades**: Always use the per-node Image Factory installer from the node's `talos/<node>-schematics.yaml`, never the generic `ghcr.io/siderolabs/installer`. This preserves extensions and the schematic ID in META.
+- **Talos upgrades**: Start every upgrade with the currency sweep (Upgrade hygiene / arc42 ADR-H-008, below). Always use the per-node Image Factory installer from the node's `talos/<node>-schematics.yaml`, never the generic `ghcr.io/siderolabs/installer`. This preserves extensions and the schematic ID in META (verify: the node reports its schematic ID back).
+- **Upgrade hygiene (arc42 ADR-H-008)**: on ANY update trigger, FIRST run a
+  currency sweep over all pinned components, then decide per finding — take the
+  patch into this window, or put a minor/major on the roadmap; never ignore.
+  Criteria + rationale (self-determination, avoid EOL Zugzwang → "Wissen ist
+  Macht") live in ADR-H-008; the Overview version table is the checklist anchor.
+  ```
+  gh release list -R siderolabs/talos -L 10   # Talos (+ its bundled k8s)
+  gh release list -R cilium/cilium   -L 10    # Cilium
+  gh release list -R rook/rook       -L 10    # Rook (Ceph tracked in ceph-cluster.yaml)
+  ```
+  Hard gate: a K8s *minor* change means verifying Cilium AND Rook support it first.
 - **Node labels for storage tiering**: every node declares its resource-capability
   axes via three boolean `homelab.local/*` labels set in its MachineConfig
   `nodeLabels`. This makes the per-disk storage tiering visible from the K8s API
