@@ -30,10 +30,10 @@ RAM) + Minisforum MS-A2, expanding to 3 nodes.
 | Kubernetes      | 1.36.2                                                     |
 | CNI             | Cilium 1.19.5 (kube-proxy replacement, WireGuard encryption, Hubble UI) |
 | Storage         | Rook-Ceph, 4× Samsung 990 PRO 4TB NVMe as OSDs (2 per node)|
-| Filesystem      | CephFS, StorageClass `rook-cephfs`                         |
+| StorageClasses  | `rook-cephfs` + `rook-ceph-block` — which one when: arc42 ADR-H-009 |
 | Ceph replication| `size: 2`, failure domain `host` (transitioned from `osd` when ms-a2-01 joined) |
 | Nodes           | `f5a-01` at `192.168.47.40` (CP), `ms-a2-01` at `192.168.47.39` (worker) |
-| Control Plane   | Single CP f5a-01. Canonical endpoint `https://192.168.47.40:6443` (SSOT: `talos/homelab-endpoint.yaml`). VIP `192.168.47.240` is configured on enp197s0 and usable as a client access path — but NOT promoted to the canonical endpoint until it survives a deliberate cold-start test (see Operational Notes) |
+| Control Plane   | Single CP f5a-01. Canonical endpoint `https://192.168.47.40:6443` (SSOT: `talos/homelab-endpoint.yaml`). VIP `192.168.47.240` is configured on enp197s0 and usable as a client access path — cold-start gate passed 2026-10-23 (power outage); promotion to canonical endpoint happens with Phase 3 |
 | LoadBalancer    | Cilium LB-IPAM + L2 Announcements, pool `192.168.47.200-209` |
 | Ingress         | None yet                                                   |
 | Secrets         | SOPS + age (field-level encryption in Git); cluster-side decryption TBD |
@@ -105,7 +105,7 @@ operational status + the bits not captured there:
   (endpoint/VIP status → Cluster Overview table).
 - **Phase 3 — SER6 Pro:** pending. Joins *together with* promoting MS-A2 to CP
   (1→3 etcd in one step). Canonical endpoint moves to VIP `.240` once 3-CP is
-  healthy AND the VIP has passed a cold-start test.
+  healthy (VIP cold-start gate already passed).
 - **Phase 4 — MS-02 Ultra (tentative):** more OSDs toward `size: 3`. Don't plan
   around it until the MS-A2 setup proves itself.
 
@@ -137,7 +137,7 @@ homelab/
   - *Kustomize* is allowed where it earns its keep, not mandated.
 - **Labels**: Use `app.kubernetes.io/name`, `app.kubernetes.io/component`, `app.kubernetes.io/part-of`.
 - **No nodeSelector/nodeAffinity** on workloads — pods must be freely schedulable across nodes.
-- **StorageClass**: Always `rook-cephfs` for PVCs.
+- **StorageClass**: chosen per PVC by access pattern — rule in arc42 ADR-H-009.
 - **Secrets**: Real values in YAML, field-level encrypted via SOPS+age. Edit with `sops <file>`, decrypt with `sops -d <file>`.
 - **Namespaces**: `soho` for business/SOHO workloads (Forgejo, CI). Future: per-customer namespaces for VPN isolation.
 - **Talos upgrades**: Start every upgrade with the currency sweep (Upgrade hygiene / arc42 ADR-H-008, below). Always use the per-node Image Factory installer from the node's `talos/<node>-schematics.yaml`, never the generic `ghcr.io/siderolabs/installer`. This preserves extensions and the schematic ID in META (verify: the node reports its schematic ID back).
@@ -185,14 +185,10 @@ from there:
   worker) is driven by etcd quorum (odd numbers, currently the 1→3 jump), not by
   what disks it holds. Tiering rules apply equally to CP and worker nodes.
 
-## Current Deployment Order
+## Roadmap
 
-1. ✅ Talos + Cilium
-2. ✅ Rook-Ceph + CephFS StorageClass
-3. ⬜ Cilium LB-IPAM + L2 Announcements (`infrastructure/cilium-lb/`)
-4. ⬜ Forgejo + PostgreSQL (`applications/forgejo/`)
-5. ⬜ MCP pods (concept: Git repos as mounted context, no RAG/vector stores)
-6. ⬜ Per-tenant web spaces for rendered documentation
+Open items, their order and triggers: `doc/req42-homelab.adoc`, chapter 11 (Roadmap
+& Backlog) — the SSOT. Don't keep a second list here.
 
 ## Useful Commands
 

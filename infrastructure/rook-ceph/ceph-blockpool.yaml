@@ -1,7 +1,5 @@
-# Ceph RBD block pool for databases (first consumer: cubeSQL).
-#
-# A database wants a block device with proper locking/fsync semantics — NOT the
-# shared CephFS network filesystem. This pool is purely ADDITIVE: it shares the
+# Ceph RBD block pool for databases — rationale: arc42 ADR-H-009
+# (doc/arc42-homelab.adoc). This pool is purely ADDITIVE: it shares the
 # existing 4x Samsung 990 PRO OSD set (like the .mgr and cephfs-* pools already
 # do) and does not touch CephFS or its data. size:2 / failureDomain host to match
 # the rest of the cluster.
@@ -15,8 +13,7 @@ spec:
   replicated:
     size: 2
 ---
-# Block StorageClass. Deliberately NOT the default "always rook-cephfs" convention
-# (LLM.md) — databases are the documented exception that wants block/RWO.
+# Block StorageClass (RWO) for databases — see arc42 ADR-H-009.
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:

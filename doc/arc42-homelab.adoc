@@ -118,7 +118,7 @@ Der Cluster stellt bereit:
 | Architekturziel | Lösungsansatz
 | Reproduzierbarkeit | Talos (immutable) + Git + SOPS/age. Per-Knoten Image-Factory-Schematic statt generischem Installer.
 | Last-Trennung | *Persistent/Volatil-Trennung pro Platte* (nicht pro Knoten) — zentrale Architekturentscheidung, siehe <<Architekturentscheidungen>>.
-| Storage | Rook-Ceph / CephFS; Replikation wächst mit der Knotenzahl (`size:2` → `size:3`).
+| Storage | Rook-Ceph; CephFS als Default, RBD-Block für Datenbanken (ADR-H-009). Replikation wächst mit der Knotenzahl (`size:2` → `size:3`).
 | Netzwerk | Cilium als CNI (kube-proxy-Ersatz, WireGuard-Verschlüsselung), LB-IPAM + L2-Announcements.
 | Pod-Mobilität | Keine `nodeSelector`/`nodeAffinity` auf Workloads (mit einer offenen Ausnahme, siehe Risiken).
 |===
@@ -149,7 +149,7 @@ nach Platte*:
 [cols="1,2,2", options="header"]
 |===
 | Tier | Platte | Charakteristik
-| Persistent / CephFS-freundlich | NVMe als Ceph-OSD | Replizierter Zustand (Forgejo, PostgreSQL, Nexus, SonarQube). Moderater I/O, persistenzwürdig.
+| Persistent / Ceph-freundlich | NVMe als Ceph-OSD | Replizierter Zustand (Forgejo, PostgreSQL, Nexus, SonarQube). Moderater I/O, persistenzwürdig. StorageClass je Zugriffsmuster: ADR-H-009.
 | Volatil / CephFS-feindlich | dedizierte lokale NVMe (UserVolume) | Compile-Scratch (Yocto `tmp/`, SSTATE, OCI-Layer). Niemals auf Ceph, niemals gemirrored.
 |===
 
@@ -174,7 +174,7 @@ homelab/
 
 === Szenario: Schreibvorgang mit Replikation (size:2)
 
-. Pod schreibt über CephFS (StorageClass `rook-cephfs`).
+. Pod schreibt über Ceph (CephFS oder RBD, StorageClass nach ADR-H-009).
 . Ceph repliziert den Block auf beide OSD-Hosts (Failure-Domain `host`).
 . Replikations-Traffic läuft über das LAN — *aktuell 1 GbE-limitiert* (siehe Risiken).
 
@@ -253,29 +253,28 @@ Betreibers (z. B. ADR-005 für Container-Runtime-Wrapper).
 
 === ADR-H-001: Persistent/Volatil-Trennung pro Platte statt pro Knoten
 
-*Status*: Akzeptiert (praktischer Nachweis ausstehend, siehe ADR-H-002). +
-*Kontext*: Ursprünglich war eine Trennung in "Storage-Knoten" und "Compute-Knoten"
+Status:: Akzeptiert (praktischer Nachweis ausstehend, siehe ADR-H-002).
+Kontext:: Ursprünglich war eine Trennung in "Storage-Knoten" und "Compute-Knoten"
 gedacht. Der Befund, dass Yocto-Builds (Millionen kleiner Dateien, Hardlink-Churn) ein
-CephFS-Anti-Pattern sind, zwang zur Schärfung. +
-*Entscheidung*: Die maßgebliche Trennlinie ist nicht Knoten-Rolle, sondern
+CephFS-Anti-Pattern sind, zwang zur Schärfung.
+Entscheidung:: Die maßgebliche Trennlinie ist nicht Knoten-Rolle, sondern
 *Persistent vs. Volatil* — und sie verläuft zwischen *Platten*, nicht zwischen
 *Maschinen*. Ein Knoten darf Ceph-OSDs (persistent) und lokales Scratch (volatil)
-gleichzeitig tragen, solange die Platten deterministisch getrennt sind. +
-*Konsequenzen*: Build-Artefakte werden durch einen *expliziten* CI-Step persistiert
+gleichzeitig tragen, solange die Platten deterministisch getrennt sind.
+Konsequenzen:: Build-Artefakte werden durch einen *expliziten* CI-Step persistiert
 (Registry-Push), nie automatisch. Verworfen wurde die frühere Annahme, der MS-02 sei
 ungeeignet — er war es nur unter der falschen Annahme "Yocto auf CephFS".
 
 === ADR-H-002: CEL-`diskSelector` für deterministische Plattenzuordnung
 
-*Status*: Akzeptiert; verifiziert gegen Talos-Doku v1.10–v1.12 + 1.13.0-Release-Notes;
-*praktischer Test auf Knoten 2 ausstehend*. +
-*Kontext*: Kernel-Enumeration (`nvme0n1` vs. `nvme1n1`) ist über Reboots nicht stabil.
-Frühere Erfahrung mit gerätepfad-basierter Config war fehleranfällig. +
-*Entscheidung*: Daten-Volumes werden über CEL-`diskSelector` (Common Expression
+Status:: Akzeptiert; verifiziert gegen Talos-Doku v1.10–v1.12 + 1.13.0-Release-Notes;
+*praktischer Test auf Knoten 2 ausstehend*.
+Kontext:: Kernel-Enumeration (`nvme0n1` vs. `nvme1n1`) ist über Reboots nicht stabil.
+Frühere Erfahrung mit gerätepfad-basierter Config war fehleranfällig.
+Entscheidung:: Daten-Volumes werden über CEL-`diskSelector` (Common Expression
 Language) nach stabilen Eigenschaften ausgewählt. `VolumeConfig` für System-Volumes
-(STATE/EPHEMERAL/IMAGE-CACHE), `UserVolumeConfig` für zusätzliche Volumes (Scratch). +
-*Regeln*:
-
+(STATE/EPHEMERAL/IMAGE-CACHE), `UserVolumeConfig` für zusätzliche Volumes (Scratch).
+Regeln::
 * NVMe-Selektoren *immer* mit `disk.transport == "nvme"` umgrenzen, damit die
   USB-C-Boot-SSD (`/dev/sda`, Transport USB/SATA) nie versehentlich getroffen wird.
 * Zwei 990 PRO (OSD) vom Scratch-NVMe über `disk.model` trennen.
@@ -283,91 +282,90 @@ Language) nach stabilen Eigenschaften ausgewählt. `VolumeConfig` für System-Vo
 * Größenkonstanten benötigen das Unsigned-Suffix `u` (z. B. `disk.size > 100u * GiB`).
 * Reale Werte vor dem Schreiben mit `talosctl get disks -o yaml` auslesen.
 
-*Konsequenzen*: Volume-Config wird *nur bei Erst-Provisionierung* angewandt. Spätere
+Konsequenzen:: Volume-Config wird *nur bei Erst-Provisionierung* angewandt. Spätere
 Selektor-Änderungen wirken nicht; Neuzuordnung erfordert Entfernen des
 `UserVolumeConfig` + `talosctl wipe disk <partition>`. Reproduzierbar, aber nicht
 live-umkonfigurierbar.
 
 === ADR-H-003: Knoten 2 = Minisforum MS-A2 (9955HX) als Compile-Knoten + OSD-Host
 
-*Status*: Akzeptiert. +
-*Kontext*: Der ursprünglich geplante zweite OSD-Host (NUC6i7KYK) fiel aus. Der
+Status:: Akzeptiert.
+Kontext:: Der ursprünglich geplante zweite OSD-Host (NUC6i7KYK) fiel aus. Der
 zunächst favorisierte Minisforum AI X1 Pro-470 (HX470, LLM-fähig) war als Barebone
-nicht beschaffbar. Verfügbar war der MS-A2. +
-*Entscheidung*: Bewusster Rollentausch — statt eines Storage+LLM-Knotens ein
+nicht beschaffbar. Verfügbar war der MS-A2.
+Entscheidung:: Bewusster Rollentausch — statt eines Storage+LLM-Knotens ein
 Storage+*Compile*-Knoten in echter Leistungsklasse (16 Zen-5-Kerne, 64 MB L3). Variante
-9955HX (Zen 5) gewählt für 1–2 Jahre Zukunftsreserve gegenüber 7945HX (Zen 4). +
-*Konsequenzen*: Der dringendste Engpass (zweiter OSD-Host für den Ceph-Mirror) wird
+9955HX (Zen 5) gewählt für 1–2 Jahre Zukunftsreserve gegenüber 7945HX (Zen 4).
+Konsequenzen:: Der dringendste Engpass (zweiter OSD-Host für den Ceph-Mirror) wird
 gelöst; zusätzlich deutlich stärkere Yocto-Compile-Leistung als der SER6. Das
 CEL-Drei-Platten-Experiment (ADR-H-002) wird auf diesem Knoten zum *produktiven*
 Tagesgeschäft (Scratch = Yocto-Build-Cache).
 
 === ADR-H-004: Slot-Belegung MS-A2 (Bandbreite dorthin, wo sie wirkt)
 
-*Status*: Akzeptiert. +
-*Entscheidung*: Die volatile Yocto-Scratch-NVMe kommt in den nativen Gen4-Slot
+Status:: Akzeptiert.
+Entscheidung:: Die volatile Yocto-Scratch-NVMe kommt in den nativen Gen4-Slot
 (Build-I/O ist lokal und heiß, nutzt die Bandbreite real). Die beiden 990 PRO (OSDs)
 kommen in die Gen3-(bis Gen4)-Slots — Ceph ist hier ohnehin netzwerk-limitiert, nicht
-durch lokale NVMe-Bandbreite. +
-*Konsequenz*: Gen3-Anbindung der OSDs ist verschmerzbar, solange das Netz der Engpass
+durch lokale NVMe-Bandbreite.
+Konsequenz:: Gen3-Anbindung der OSDs ist verschmerzbar, solange das Netz der Engpass
 ist (siehe ADR-H-006 / Risiken).
 
 === ADR-H-005: Primäres Netzwerk-Interface des MS-A2 = Realtek RTL8125
 
-*Status*: Akzeptiert (revidiert 2026-07-03; ursprünglich war die Intel I226-V
-vorgesehen). +
-*Kontext*: Zunächst war die Intel I226-V (`igc`) als robusterer Treiber geplant,
+Status:: Akzeptiert (revidiert 2026-07-03; ursprünglich war die Intel I226-V
+vorgesehen).
+Kontext:: Zunächst war die Intel I226-V (`igc`) als robusterer Treiber geplant,
 Realtek als Reserve. In Betrieb genommen wurde jedoch die Realtek RTL8125
 (`enp3s0`, `r8169`, MAC `…7b:dd`) — und der DHCP-Fixlease `.39` in der FritzBox ist
-an genau diese MAC gebunden. Die *Schnittstelle definiert damit die IP*. +
-*Entscheidung*: Realtek bleibt primäres Cluster-Interface. Begründung: (a) beide
+an genau diese MAC gebunden. Die *Schnittstelle definiert damit die IP*.
+Entscheidung:: Realtek bleibt primäres Cluster-Interface. Begründung: (a) beide
 Ports sind 2.5 GbE — kein Durchsatzunterschied; (b) die befürchtete
 r8169-Instabilität ist nicht eingetreten (stabil seit Inbetriebnahme, auf `f5a-01`
 ohnehin nachgewiesen); (c) ein Wechsel auf `igc` (`enp4s0`, MAC `…7b:de`) erforderte
 physisches Umstecken *und* Umbiegen des FritzBox-Fixlease auf die andere MAC —
 mittlerer Aufwand ohne Nutzen; (d) die zuvor fehlende r8169-Errata-Firmware liefert
-jetzt die `siderolabs/realtek-firmware`-Extension (im Node-Schematic gepinnt). +
-*Konsequenz*: Die Intel I226-V bleibt verkabelbare Reserve; die 10G-X710-Ports
+jetzt die `siderolabs/realtek-firmware`-Extension (im Node-Schematic gepinnt).
+Konsequenz:: Die Intel I226-V bleibt verkabelbare Reserve; die 10G-X710-Ports
 bleiben Zukunftsreserve (ADR-H-006). Kein Handgriff und kein FritzBox-Umbau nötig.
 
 === ADR-H-006: Netzwerk bleibt vorerst 1 GbE; 10G als geplante Reserve
 
-*Status*: Akzeptiert (bewusste Vertagung). +
-*Kontext*: Der GS2220-24 liefert an RJ45 nur 1 GbE. Die 2.5-GbE-NICs laufen gedrosselt.
+Status:: Akzeptiert (bewusste Vertagung).
+Kontext:: Der GS2220-24 liefert an RJ45 nur 1 GbE. Die 2.5-GbE-NICs laufen gedrosselt.
 Die 10G-X710-Ports des MS-A2 brächten nur mit zweitem SFP+-OSD-Host *und* passender
-Switch-Seite Nutzen. +
-*Entscheidung*: Ceph-Mirror startet über 1 GbE. 10G-Pfad (zweiter MS-A2 + SFP+-Slots
+Switch-Seite Nutzen.
+Entscheidung:: Ceph-Mirror startet über 1 GbE. 10G-Pfad (zweiter MS-A2 + SFP+-Slots
 des Zyxel bzw. DAC-Direktverbindung) wird als künftiger Ausbauweg dokumentiert, nicht
-heute beschritten. +
-*Konsequenz*: Ceph-Recovery/Rebalancing ist 1G-limitiert (~2–3 h pro TB). Bestimmender
+heute beschritten.
+Konsequenz:: Ceph-Recovery/Rebalancing ist 1G-limitiert (~2–3 h pro TB). Bestimmender
 Faktor für das Ausfall-Risikofenster (siehe Laufzeitsicht / Risiken).
 
 === ADR-H-007: Schwere LLM-Last vertagt
 
-*Status*: Akzeptiert (geparkt, mit benanntem Parkplatz). +
-*Entscheidung*: Schwere lokale LLM-Inferenz (große Modelle, hohe Speicherbandbreite)
+Status:: Akzeptiert (geparkt, mit benanntem Parkplatz).
+Entscheidung:: Schwere lokale LLM-Inferenz (große Modelle, hohe Speicherbandbreite)
 wird *nicht* auf einem x86-Cluster-Knoten gelöst, sondern auf einer künftigen dedizierten
 Maschine (Apple Silicon M5 Max/Ultra; Strix-Halo als x86-Vergleich). Wartegrund:
 nächste Apple-Generation + entspanntere RAM-/Flash-Preise. Leichte LLM-Last verbleibt
-solange auf `f5a-01`. +
-*Begründung*: Strix-Halo-Klasse (Unified Memory, 256-bit) verletzt das harte
+solange auf `f5a-01`.
+Begründung:: Strix-Halo-Klasse (Unified Memory, 256-bit) verletzt das harte
 SO-DIMM-Kriterium (verlöteter RAM) und kostet ein Vielfaches; sie ist eine eigene Liga,
 kein Cluster-Storage-Knoten.
 
 === ADR-H-008: Upgrade-Hygiene — Currency-Sweep bei jedem Update-Trigger
 
-*Status*: Akzeptiert (2026-07-14). +
-*Kontext*: Die Komponenten (Talos, Kubernetes, Cilium, Rook, Ceph) haben
+Status:: Akzeptiert (2026-07-14).
+Kontext:: Die Komponenten (Talos, Kubernetes, Cilium, Rook, Ceph) haben
 *unabhängige* Release-Ströme. Wer nur reaktiv patcht, driftet unbemerkt und gerät
 in *Zugzwang* — durch auslaufenden Support (EOL), eine Sicherheitslücke oder einen
 Kompatibilitätsbruch, den man zu spät entdeckt. Leitsatz: *Wissen ist Macht* —
-Aktualitäts-Wissen erhält die *Selbstbestimmtheit* über das *Wann* eines Upgrades. +
-*Entscheidung*: Bei *jedem* Update-Trigger (gleich welcher Komponente) zuerst ein
+Aktualitäts-Wissen erhält die *Selbstbestimmtheit* über das *Wann* eines Upgrades.
+Entscheidung:: Bei *jedem* Update-Trigger (gleich welcher Komponente) zuerst ein
 *Currency-Sweep* über *alle* gepinnten Komponenten (via `gh release list` gegen die
 Versionstabelle in CLAUDE.md/LLM.md als SSOT-Checklisten-Anker). Jeder Fund wird
-bewertet und *entschieden*: mitnehmen oder auf die Roadmap — nie ignorieren. +
-*Prüfkriterien* je Fund:
-
+bewertet und *entschieden*: mitnehmen oder auf die Roadmap — nie ignorieren.
+Prüfkriterien je Fund::
 * *Art*: Patch (gleiche Minor) / Minor / Major — bestimmt Risiko + Aufwand.
 * *Kompatibilität*: unterstützt die neue Version noch unser K8s / Ceph / Talos?
   *Hartes Gate* bei K8s-*Minor*: Cilium *und* Rook vorher gegen die neue
@@ -378,13 +376,35 @@ bewertet und *entschieden*: mitnehmen oder auf die Roadmap — nie ignorieren. +
   priorisieren; das ist der eigentliche Selbstbestimmtheits-Hebel gegen Zugzwang.
 * *Disruption*: Reboots, CRD-Migrationen, Rollback-Pfad.
 
-*Entscheidungslogik*: kompatibler *Patch* → ins ohnehin anstehende Wartungsfenster
+Entscheidungslogik:: kompatibler *Patch* → ins ohnehin anstehende Wartungsfenster
 mitnehmen (Effizienz). *Minor* → deliberat, mitnehmen *oder* Roadmap (ein Minor pro
 Schritt). *Major* → dedizierte Evaluierung + Roadmap. EOL-Nähe hebt die Priorität
-unabhängig von der Art. +
-*Konsequenzen*: Updates geschehen zu *unseren* Bedingungen, nicht unter Druck. Die
+unabhängig von der Art.
+Konsequenzen:: Updates geschehen zu *unseren* Bedingungen, nicht unter Druck. Die
 Versionstabelle bleibt Pflicht-aktuell (Version-Currency-Rule); der Sweep ist Teil
 jedes Upgrade-Runbooks.
+
+=== ADR-H-009: StorageClass nach Zugriffsmuster — CephFS-Default, RBD-Block für Datenbanken
+
+Status:: Akzeptiert (2026-10-23).
+Kontext:: Rook-Ceph bietet auf demselben OSD-Satz zwei Zugriffswege: CephFS
+(StorageClass `rook-cephfs`, POSIX-Netzwerkdateisystem, RWX-fähig) und RBD
+(StorageClass `rook-ceph-block`, Pool `replicapool`, Blockgerät, RWO). Datenbanken
+(SQLite, PostgreSQL) verlassen sich auf Datei-Locking und `fsync`-Semantik eines
+lokalen Dateisystems; über ein Netzwerkdateisystem mit MDS sind diese Garantien
+schwächer und teurer.
+Entscheidung::
+* *Default*: `rook-cephfs` — für Datei-Zustand und alles, was RWX braucht
+  (z. B. LLM-Gewichte, die mehrere Pods lesen).
+* *Ausnahme Datenbanken*: `rook-ceph-block` (RWO, ext4) für jede Datenbank-Datei,
+  auch eingebettete (SQLite).
+* Beide Pools liegen auf denselben OSDs, `size:2` / Failure-Domain `host`; der
+  Block-Pool ist rein additiv (`infrastructure/rook-ceph/ceph-blockpool.yaml`).
+
+Konsequenzen:: Die StorageClass ist eine bewusste Wahl je PVC, kein Pauschal-Default.
+RBD-Volumes sind RWO und an einen Pod gebunden — Pod-Mobilität bleibt erhalten
+(das Image wandert mit), Parallelzugriff nicht. Forgejo (SQLite auf CephFS) verletzt
+die Regel und wird migriert (siehe Risiken).
 
 == Qualitätsanforderungen
 
@@ -397,6 +417,9 @@ jedes Upgrade-Runbooks.
 
 == Risiken und technische Schulden
 
+Zeitplanung und Auslöser der Gegenmaßnahmen: `req42-homelab.adoc`, Kapitel 11
+(Roadmap & Backlog).
+
 [cols="1,3,2", options="header"]
 |===
 | Risiko / Schuld | Beschreibung | Status / Gegenmaßnahme
@@ -408,6 +431,7 @@ jedes Upgrade-Runbooks.
 | `nodeSelector`-Spannung | Build-Pod, der lokales Scratch braucht, muss auf genau diesen Knoten — Konflikt mit "keine `nodeAffinity`"-Regel. | OFFEN — Designpunkt lokales-Storage-Affinität vs. Pod-Mobilität.
 | Backup fehlt | Kein Backup-Konzept. | Bewusst nachgelagert ("kein Cluster, kein Backup"); Pflicht *vor* Produktivlast.
 | Cluster-seitige SOPS-Entschlüsselung | Noch nicht gelöst. | TBD.
+| Forgejo-SQLite auf CephFS | Forgejo nutzt `DB_TYPE = sqlite3` auf `rook-cephfs` — verletzt ADR-H-009 (Datenbank gehört auf Block). | OFFEN — Migration der Forgejo-PVC auf `rook-ceph-block` geplant.
 | `--config-patch` mixed types | Frühere Notiz "unzuverlässig" stammt aus Vor-1.13-Zeit. | UNVERIFIZIERT für 1.13 — vor Verlass darauf prüfen.
 |===
 
