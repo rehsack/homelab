@@ -20,21 +20,37 @@ wird gestrichen, nicht abgehakt; die Historie steht in Git.
 
 === Als Nächstes
 
-Repository veröffentlichen::
-Push nach GitHub *und* Forgejo. Die bestehende Historie reicht: SOPS+age seit dem
-ersten Commit (`48d2504`); `gitleaks git` über alle 41 Commits fand am 2026-10-23 keine
-echten Klartext-Secrets, nur 11 auskommentierte Talos-Beispielwerte aus
-`talosctl gen config` (`# … example (do not use in production!)`). Das pre-commit-Gate
-sieht nur Gestagtes und trifft sie nicht; ein Range-Scan über die alte Historie (CI,
-`range-gates`) braucht dafür eine Allowlist in `.gitleaks.toml`.
-Auslöser;; jetzt — das gitleaks-Gate ist aktiv.
+Update-Runde Oktober 2026::
+Erledigt: Cilium 1.20.4. Offen, in dieser Reihenfolge: Rook 1.19.12 → 1.20.9 (1.19 ist
+nur bis K8s 1.35 getestet), Ceph 19.2.7, Talos 1.13.12 → 1.14.4 (nur OS — K8s und etcd
+bleiben gepinnt), K8s 1.36.5 und etcd-3.6-Patch, dann Forgejo (nächster Punkt).
+Auslöser;; läuft.
 
-Forgejo-Datenbank auf Block migrieren::
+Forgejo auf Block migrieren und spiegeln::
 Forgejo läuft mit SQLite auf `rook-cephfs` und verletzt damit ADR-H-009. Die PVC wird
-auf `rook-ceph-block` umgezogen (neue PVC, Daten kopieren, Deployment umhängen).
-Auslöser;; nächstes Wartungsfenster; spätestens vor produktiver Forgejo-Nutzung.
+auf `rook-ceph-block` umgezogen (neue PVC, Daten kopieren, Deployment umhängen); dabei
+`ENABLE_PUSH_CREATE_USER` einschalten und Forgejo 14 (keine Patches mehr) auf ein
+gepflegtes Major heben. Danach legt Jens den User `rehsack` samt SSH-Key an und das
+Repository wird nach Forgejo gepusht (GitHub: `rehsack/homelab`, öffentlich seit
+2026-10-25). Ein Range-Scan über die alte Historie (CI, `range-gates`) braucht eine
+gitleaks-Allowlist für die 11 auskommentierten Talos-Beispielwerte aus
+`talosctl gen config`.
+Auslöser;; Ende der Update-Runde; spätestens vor produktiver Forgejo-Nutzung.
 
 === Mittelfristig
+
+Kubernetes 1.37 + Cilium 1.21::
+Talos 1.14 brächte K8s 1.37.1 mit, Cilium 1.20 ist aber nur bis 1.36 getestet (Hard
+Gate, ADR-H-008). Talos-Upgrades bleiben bis dahin OS-only.
+Auslöser;; Cilium 1.21.1 (1.21 trägt 1.37 in seiner Support-Matrix).
+
+Rook 1.21::
+Erst wenige Tage alt; 1.20.9 trägt K8s bis 1.37.
+Auslöser;; Rook 1.21.1.
+
+etcd 3.7::
+Talos 1.14 brächte etcd 3.7; ein etcd-Minor auf dem einzigen CP hat kein Netz.
+Auslöser;; 3 CPs (Phase 3).
 
 Phase 3 — SER6 eingemeinden::
 . *Use-Case-Audit + Migration* des SER6 — beim Eingemeinden wird seine Platte
