@@ -24,7 +24,7 @@ nodes.
 
 | Component        | Details                                                                               |
 | ---------------- | ------------------------------------------------------------------------------------- |
-| OS               | Talos Linux 1.13.12                                                                   |
+| OS               | Talos Linux 1.14.4                                                                    |
 | Kubernetes       | 1.36.2                                                                                |
 | CNI              | Cilium 1.20.4 (kube-proxy replacement, WireGuard encryption, Hubble UI)               |
 | Storage          | Rook-Ceph, 4× Samsung 990 PRO 4TB NVMe as OSDs (2 per node)                           |

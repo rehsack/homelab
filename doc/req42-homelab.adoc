@@ -22,8 +22,9 @@ wird gestrichen, nicht abgehakt; die Historie steht in Git.
 
 Update-Runde Oktober 2026::
 Erledigt: Cilium 1.20.4, Ceph 19.2.7 samt Rotation der Daemon-Schlüssel
-(CVE-2025-30156), Rook 1.20.9 mit `ceph-csi-drivers` 1.0.4. Offen, in dieser
-Reihenfolge: Talos 1.13.12 → 1.14.4 (nur OS — K8s und etcd bleiben gepinnt), K8s 1.36.5
+(CVE-2025-30156), Rook 1.20.9 mit `ceph-csi-drivers` 1.0.4, Talos 1.14.4 (nur OS).
+Offen, in dieser Reihenfolge: lokales `talosctl` 1.14.4, `FilesystemTrimConfig`
+(fehlt nach Upgrades, TRIM ist sonst aus), Kaltstart-Abnahme beider Knoten, K8s 1.36.5
 und etcd-3.6-Patch, dann Forgejo (nächster Punkt).
 Auslöser;; läuft.
 
@@ -57,6 +58,20 @@ Rook-Anleitung (`keyType: aes256k`, `keepPriorKeyCountMax: 1`, Knoten nacheinand
 drainen), danach `allowedCiphers: [aes256k]` und die Stummschaltung aufheben
 (`infrastructure/rook-ceph/README.md`).
 Auslöser;; Talos-Release mit Linux 7.0+.
+
+Rook-Toleranz eingrenzen::
+`placement.all.tolerations: [{operator: Exists}]` in `ceph-cluster.yaml` toleriert auch
+`unschedulable`: Beim Talos-Upgrade legt der Scheduler Mgr/OSD/Crash-Pods trotz Cordon
+auf den herunterfahrenden Knoten, Hunderte `NodeShutdown`-Leichen folgen. f5a-01 hat
+kein Taint — die Toleranz ist ersatzlos zu prüfen; Änderung startet alle Ceph-Daemons neu.
+Auslöser;; nächstes Ceph-Update (Daemons starten dann ohnehin neu).
+
+Talos-Config auf Multi-Document::
+Talos 1.14 markiert große Teile der v1alpha1-Config als deprecated (`.machine.kubelet`,
+`.cluster.*`, `nodeLabels`, `.machine.install` → `UnattendedInstall`, …); sie funktionieren
+weiter. Migration der Patches in `talos/` auf die neuen Dokumente.
+Auslöser;; Talos-Release, das ein genutztes Feld entfernt; spätestens Phase 3
+(neue Knoten-Configs).
 
 etcd 3.7::
 Talos 1.14 brächte etcd 3.7; ein etcd-Minor auf dem einzigen CP hat kein Netz.
