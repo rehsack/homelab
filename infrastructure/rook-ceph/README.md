@@ -9,11 +9,11 @@ Two layers, deliberately split:
    [`storageclass-cephfs.yaml`](./storageclass-cephfs.yaml), [`toolbox.yaml`](./toolbox.yaml),
    [`namespace.yaml`](./namespace.yaml).
 
-|                                  |                                                  |
-| -------------------------------- | ------------------------------------------------ |
-| Chart repo                       | `https://charts.rook.io/release`                 |
-| Operator chart version (running) | `rook-ceph-v1.19.7` / app `v1.19.7` (revision 2) |
-| Ceph version (running)           | `19.2.4` squid (pinned in `ceph-cluster.yaml`)   |
+|                                  |                                                    |
+| -------------------------------- | -------------------------------------------------- |
+| Chart repo                       | `https://charts.rook.io/release`                   |
+| Operator chart version (running) | `rook-ceph-v1.19.12` / app `v1.19.12` (revision 3) |
+| Ceph version (running)           | `19.2.4` squid (pinned in `ceph-cluster.yaml`)     |
 
 ## Reproduce / reconcile the current state
 
@@ -22,7 +22,7 @@ helm repo add rook-release https://charts.rook.io/release
 helm repo update
 helm upgrade --install rook-ceph rook-release/rook-ceph \
   --namespace rook-ceph --create-namespace \
-  --version v1.19.7 \
+  --version v1.19.12 \
   -f infrastructure/rook-ceph/operator-values.yaml
 # then the CRs (operator must be Ready first):
 kubectl apply -f infrastructure/rook-ceph/
@@ -37,6 +37,12 @@ Rook upgrades in two independent tracks — **do not bundle them**:
   is a separate minor step — follow the Rook upgrade guide, one minor at a time. Note: the operator image pulls from
   docker.io over the 25 Mbit WAN — a fresh version can sit in `ContainerCreating` for minutes; that's the uplink, not a
   fault. Node reboots leave many `ContainerStatusUnknown` daemon pods behind — clean them up afterwards.
+  - Pre-pull first: image extraction on f5a-01 stalls etcd (arc42 Risiken). A throwaway DaemonSet whose init containers
+    run `true` in `rook/ceph:<new>` and the new `cephcsi` image (from the chart's `csi` values) does it; delete it once
+    READY on all nodes.
+  - The CSI plugins are rolled by the separate ceph-csi operator (`ceph-csi-controller-manager`). It does not react when
+    Rook rewrites `rook-csi-operator-image-set-configmap`; if the CSI pods keep the old `cephcsi` image,
+    `kubectl -n rook-ceph rollout restart deploy/ceph-csi-controller-manager`.
 - **Ceph** (the data plane, currently 19.2.4 squid): bumped by editing `spec.cephVersion.image` in `ceph-cluster.yaml`,
   never a floating tag.
 
