@@ -21,8 +21,8 @@ wird gestrichen, nicht abgehakt; die Historie steht in Git.
 === Als Nächstes
 
 Update-Runde Oktober 2026::
-Erledigt: Cilium 1.20.4, Rook 1.19.12. Offen, in dieser Reihenfolge: Ceph 19.2.7 samt
-Rotation der Daemon-Schlüssel (CVE-2025-30156), Rook 1.20.9 (1.19 ist nur bis K8s 1.35
+Erledigt: Cilium 1.20.4, Rook 1.19.12, Ceph 19.2.7 samt Rotation der Daemon-Schlüssel
+(CVE-2025-30156). Offen, in dieser Reihenfolge: Rook 1.20.9 (1.19 ist nur bis K8s 1.35
 getestet), Talos 1.13.12 → 1.14.4 (nur OS — K8s und etcd
 bleiben gepinnt), K8s 1.36.5 und etcd-3.6-Patch, dann Forgejo (nächster Punkt).
 Auslöser;; läuft.

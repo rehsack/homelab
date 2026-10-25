@@ -6,8 +6,18 @@ metadata:
   namespace: rook-ceph
 spec:
   cephVersion:
-    image: quay.io/ceph/ceph:v19.2.4   # pin exact patch — never a floating tag
+    image: quay.io/ceph/ceph:v19.2.7   # pin exact patch — never a floating tag
     allowUnsupported: false
+  # CVE-2025-30156: daemon keys (mon/mgr/osd/mds, crash, exporter, admin) on
+  # AES256K, rotated once together with the update to 19.2.7. Raise the
+  # generation to rotate again — best together with the next image change,
+  # when the daemons restart anyway. CSI keys stay AES: kernel mounts need
+  # Linux 7.0+ for AES256K (README, Upgrade).
+  security:
+    cephx:
+      daemon:
+        keyRotationPolicy: KeyGeneration
+        keyGeneration: 2
   dataDirHostPath: /var/lib/rook
   mon:
     count: 1

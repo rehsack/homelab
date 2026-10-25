@@ -13,7 +13,7 @@ Two layers, deliberately split:
 | -------------------------------- | -------------------------------------------------- |
 | Chart repo                       | `https://charts.rook.io/release`                   |
 | Operator chart version (running) | `rook-ceph-v1.19.12` / app `v1.19.12` (revision 3) |
-| Ceph version (running)           | `19.2.4` squid (pinned in `ceph-cluster.yaml`)     |
+| Ceph version (running)           | `19.2.7` squid (pinned in `ceph-cluster.yaml`)     |
 
 ## Reproduce / reconcile the current state
 
@@ -43,8 +43,19 @@ Rook upgrades in two independent tracks — **do not bundle them**:
   - The CSI plugins are rolled by the separate ceph-csi operator (`ceph-csi-controller-manager`). It does not react when
     Rook rewrites `rook-csi-operator-image-set-configmap`; if the CSI pods keep the old `cephcsi` image,
     `kubectl -n rook-ceph rollout restart deploy/ceph-csi-controller-manager`.
-- **Ceph** (the data plane, currently 19.2.4 squid): bumped by editing `spec.cephVersion.image` in `ceph-cluster.yaml`,
-  never a floating tag.
+- **Ceph** (the data plane): bumped by editing `spec.cephVersion.image` in `ceph-cluster.yaml` and `toolbox.yaml`
+  together, never a floating tag. Pre-pull `quay.io/ceph/ceph:<new>` the same way as above, then `kubectl apply`.
+  - CephX keys (CVE-2025-30156): daemon keys run on AES256K since 19.2.7 (`spec.security.cephx.daemon`). A rotation
+    raises `HEALTH_ERR` (`AUTH_INSECURE_SERVICE_*`) until the daemons have restarted — expected; the
+    `AUTH_INSECURE_ROTATING_SERVICE_KEY_TYPE` warning clears 2–3 h later. Done when `status.cephx` of the CephCluster
+    and the CephFilesystem show the new `keyGeneration`. CSI keys stay `aes` and `AUTH_INSECURE_CLIENT_KEY_TYPE` stays:
+    kernel mounts need Linux 7.0+ for AES256K (Talos 1.14 ships 6.18) — rotation guide:
+    <https://rook.io/docs/rook/latest/Storage-Configuration/Advanced/cephx-keys/>.
+- **Toolbox** (`toolbox.yaml`): our own lean variant, not Rook's `deploy/examples/toolbox.yaml`. It reads the mon
+  address and the admin key once at start (env from the `rook-ceph-config` and `rook-ceph-mon` Secrets).
+  - Before a Rook bump: check that the target release still provides these Secrets and keys — the upstream manifest of
+    the target tag shows what Rook ships.
+  - After an admin key rotation or a mon move: `kubectl -n rook-ceph rollout restart deploy/rook-ceph-tools`.
 
 Precondition for any node reboot during these upgrades: `ceph -s` = `HEALTH_OK`, and scale CephFS-consuming workloads
 (e.g. `soho/forgejo`) to 0 first to avoid the mount-hang. Clean up stuck pods afterwards.

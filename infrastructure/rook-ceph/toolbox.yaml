@@ -17,11 +17,13 @@ spec:
     spec:
       containers:
         - name: rook-ceph-tools
-          image: quay.io/ceph/ceph:v19.2.4
+          image: quay.io/ceph/ceph:v19.2.7
           # Assemble ceph.conf + admin keyring from the rook-provided mon host
           # and admin secret (via env), then idle. /etc/ceph must be a writable
           # emptyDir — projecting the secrets straight onto it is read-only AND
           # ceph needs an assembled ceph.conf, not raw files (conf_read_file).
+          # Env is read once at start: after a mon move or an admin key
+          # rotation, restart the toolbox (README, Upgrade).
           command:
             - /bin/bash
             - -c
