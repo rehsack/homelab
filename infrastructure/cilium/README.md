@@ -7,7 +7,7 @@ this repo capture; see git history).
 |                               |                                                                          |
 | ----------------------------- | ------------------------------------------------------------------------ |
 | Chart repo                    | `https://helm.cilium.io/`                                                |
-| Chart / app version (running) | `cilium-1.19.5` / `v1.19.5` (revision 3)                                 |
+| Chart / app version (running) | `cilium-1.19.10` / `v1.19.10` (revision 4)                               |
 | Values                        | [`values.yaml`](./values.yaml)                                           |
 | Related plain-YAML CRs        | [`../cilium-lb/`](../cilium-lb/) (LB-IPAM pool + L2 announcement policy) |
 
@@ -18,7 +18,7 @@ helm repo add cilium https://helm.cilium.io/
 helm repo update
 helm upgrade --install cilium cilium/cilium \
   --namespace kube-system \
-  --version 1.19.5 \
+  --version 1.19.10 \
   -f infrastructure/cilium/values.yaml
 ```
 

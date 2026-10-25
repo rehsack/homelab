@@ -26,7 +26,7 @@ nodes.
 | ---------------- | ------------------------------------------------------------------------------------- |
 | OS               | Talos Linux 1.13.6                                                                    |
 | Kubernetes       | 1.36.2                                                                                |
-| CNI              | Cilium 1.19.5 (kube-proxy replacement, WireGuard encryption, Hubble UI)               |
+| CNI              | Cilium 1.19.10 (kube-proxy replacement, WireGuard encryption, Hubble UI)              |
 | Storage          | Rook-Ceph, 4× Samsung 990 PRO 4TB NVMe as OSDs (2 per node)                           |
 | StorageClasses   | `rook-cephfs` + `rook-ceph-block` — which one when: arc42 ADR-H-009                   |
 | Ceph replication | `size: 2`, failure domain `host` (transitioned from `osd` when ms-a2-01 joined)       |
