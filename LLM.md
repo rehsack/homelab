@@ -24,7 +24,7 @@ nodes.
 
 | Component        | Details                                                                               |
 | ---------------- | ------------------------------------------------------------------------------------- |
-| OS               | Talos Linux 1.13.6                                                                    |
+| OS               | Talos Linux 1.13.12                                                                   |
 | Kubernetes       | 1.36.2                                                                                |
 | CNI              | Cilium 1.20.4 (kube-proxy replacement, WireGuard encryption, Hubble UI)               |
 | Storage          | Rook-Ceph, 4× Samsung 990 PRO 4TB NVMe as OSDs (2 per node)                           |
@@ -206,7 +206,10 @@ kubectl get pods -A -w
   losing quorum), so the upgrade never reaches image-pull/reboot. Symptom: machine stage stays `running`, no installer
   activity, `talosctl upgrade` produces no output. With `--drain=false` Talos stops pods via its own shutdown sequence
   instead. Still drain *workload* CephFS pods (e.g. Forgejo `scale --replicas=0`) manually beforehand to avoid the
-  mount-hang above; the rook-ceph daemons (mon/mds/osd) come back on their own after the reboot.
+  mount-hang above; the rook-ceph daemons (mon/mds/osd) come back on their own after the reboot. `kubectl cordon` the
+  node first (`uncordon` once Ready): `--drain=false` skips the cordon too, and the scheduler keeps placing replacement
+  pods on the node going down — hundreds of `NodeShutdown` rejects pile up in seconds. Cordoning evicts nothing, so the
+  mon PDB doesn't block.
 - **talosctl version pinning**: Pin `siderolabs/tap/talosctl` in brew (`brew pin`) to match the server version.
   Cross-version gRPC keepalive issues between 1.13.x client and 1.12.x server cause upgrade failures.
 - **Talos VIP on single-node**: VIP works but the operator resigns during (even failed) upgrades and doesn't re-campaign

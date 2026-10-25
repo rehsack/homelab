@@ -1,6 +1,6 @@
 machine:
   install:
-    image: factory.talos.dev/metal-installer/eeff3d8f1ff6106f82f0c27c7be79d819ec1f6a084f80147a8fba4a6b156e292:v1.13.6
+    image: factory.talos.dev/metal-installer/eeff3d8f1ff6106f82f0c27c7be79d819ec1f6a084f80147a8fba4a6b156e292:v1.13.12
     disk: /dev/sda
     wipe: true
   kubelet:
