@@ -51,3 +51,8 @@ securityContext:
       - NET_ADMIN
       - SYS_ADMIN
       - SYS_RESOURCE
+# One node at a time: the chart default (2) replaces every agent at once on a
+# two-node cluster, leaving no node able to start pods mid-rollout.
+updateStrategy:
+  rollingUpdate:
+    maxUnavailable: 1
