@@ -210,7 +210,7 @@ kubectl get pods -A -w
   node first (`uncordon` once Ready): `--drain=false` skips the cordon too, and the scheduler keeps placing replacement
   pods on the node going down — hundreds of `NodeShutdown` rejects pile up in seconds. Cordoning evicts nothing, so the
   mon PDB doesn't block.
-- **talosctl version pinning**: Pin `siderolabs/tap/talosctl` in brew (`brew pin`) to match the server version.
+- **talosctl version pinning**: Pin `talosctl` (homebrew/core) in brew (`brew pin`) to match the server version.
   Cross-version gRPC keepalive issues between 1.13.x client and 1.12.x server cause upgrade failures.
 - **Talos VIP on single-node**: VIP works but the operator resigns during (even failed) upgrades and doesn't re-campaign
   in 1.12.x. Fixed in 1.13.x. Never point the endpoint to VIP until VIP has survived a full reboot cycle.
