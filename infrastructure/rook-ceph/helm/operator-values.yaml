@@ -8,6 +8,6 @@
 # reproduces the running state exactly.
 #
 # The CephCluster / CephFilesystem / StorageClass / toolbox are NOT part of this
-# Helm release — they are plain-YAML CRs in this directory, applied with
-# `kubectl apply` AFTER the operator is up. See README.md.
+# Helm release — they are plain-YAML CRs in the parent directory, applied with
+# `kubectl apply` AFTER the operator is up. See ../README.md.
 {}

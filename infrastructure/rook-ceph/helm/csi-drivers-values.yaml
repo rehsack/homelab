@@ -1,0 +1,54 @@
+# ceph-csi-drivers Helm values — SSOT for the `ceph-csi-drivers` release
+# (namespace rook-ceph), required since Rook 1.20: Rook no longer deploys the
+# CSI drivers, this chart declares them for the ceph-csi operator that the
+# rook-ceph chart ships.
+#
+# Base: Rook's recommended values (deploy/charts/ceph-csi-drivers/values.yaml
+# at the Rook tag) — driver names prefixed with the operator namespace, as the
+# StorageClasses expect. On top, what Rook 1.19 ran, where it matters:
+#
+# - log rotation off: on, the plugins log into files on a hostPath — on f5a-01
+#   that is EPHEMERAL, the etcd disk (arc42 Risiken). Logs stay on stdout.
+# - controller plugin as before: 2 replicas (one per node), pod network,
+#   Recreate on update.
+# - no snapshots: the cluster has no snapshot CRDs/controller; the backup
+#   concept (req42 roadmap) decides that.
+
+operatorConfig:
+  namespace: rook-ceph
+  driverSpecDefaults:
+    clusterName: rook-ceph
+    imageSet:
+      name: rook-csi-operator-image-set-configmap
+    log:
+      rotation:
+        enabled: false
+    nodePlugin:
+      priorityClassName: system-node-critical
+    controllerPlugin:
+      priorityClassName: system-cluster-critical
+      deploymentStrategy:
+        type: Recreate
+
+drivers:
+  rbd:
+    enabled: true
+    name: rook-ceph.rbd.csi.ceph.com
+    log:
+      rotation:
+        enabled: false
+    controllerPlugin:
+      replicas: 2
+  cephfs:
+    enabled: true
+    name: rook-ceph.cephfs.csi.ceph.com
+    snapshotPolicy: none
+    log:
+      rotation:
+        enabled: false
+    controllerPlugin:
+      replicas: 2
+  nfs:
+    enabled: false
+  nvmeof:
+    enabled: false
