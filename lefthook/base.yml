@@ -1,0 +1,212 @@
+# SPDX-FileCopyrightText: 2026 Jens Rehsack <sno@netbsd.org>
+# SPDX-License-Identifier: Apache-2.0
+
+# lefthook/base.yml — the base contract of lefthook-qa-gates.
+#
+# Consumed, not copied. A repository takes it through lefthook's `remotes:`, pinned to a
+# release tag, and this repository takes it through `extends:` — see
+# share/lefthook-qa-gates/seeds/lefthook.example.yml and ../lefthook.yml.
+#
+# Every job here is filtered by what it checks, so a repository without a compose file
+# never runs dclint and nothing has to be pruned. A job that does not fit is switched off
+# (`skip: true`) or narrowed (`exclude:`) by name in the consumer's lefthook.yml; job
+# names are therefore part of the contract, and renaming one is a breaking change.
+#
+# Where both set a key, this file wins — lefthook merges same-named jobs that way for
+# `remotes:` and `extends:` alike (measured, 2.2.2). A consumer can add keys to a job,
+# not replace them; a different command is a job of its own. Keys a consumer is expected
+# to add (`skip`, `exclude`) are therefore never set here.
+#
+# INVARIANT — no container reference in this file. Jobs name tools; the {gates} template
+# decides where they come from. Empty (as below) means native — the CI case, where
+# lefthook runs inside the image. Filled in lefthook-local.yml, it is a prefix such as
+# `docker compose exec -T gates`, and lefthook runs on the host beside git. Never both,
+# and never nested.
+#
+# INVARIANT — one command with arguments per job. No multi-line block, no `$( … )`, no
+# pipe, no `&&`, no negation, in `run:` and in `skip:` alike. Windows builds the call as
+# one composite string where the Unix path passes the arguments separately
+# (evilmartians/lefthook#1167). Whatever needs logic is a wrapper in the image.
+# check-lefthook holds this file to both.
+#
+# A template expands to a *prefix* that ends before the tool name, so the image sets no
+# ENTRYPOINT.
+
+# The current release, not the oldest one that happens to parse this file. An older
+# lefthook swallows an unknown key without a word, so a version floor that lags a key
+# used here turns a gate into a no-op nobody is told about.
+min_version: 2.2.2
+
+# An empty string, not an empty key: a key without a value is YAML null, and lefthook's
+# schema wants a string — `lefthook validate` rejects null while expanding it to the same
+# nothing at run time.
+templates:
+  gates: ""
+
+pre-commit:
+  parallel: true
+  # The fixers below write; this is what makes them a gate anyway. lefthook compares the
+  # tracked files before and after, so a correction fails the commit and stays unstaged
+  # for review — deliberately not `stage_fixed`, which would commit it unseen.
+  fail_on_changes: "always"
+  fail_on_changes_diff: true
+  jobs:
+
+    # Whitespace, EOL and final newline for every language from one SSOT (.editorconfig).
+    # --fix applies only the safe fixes — trailing whitespace, line endings, the final
+    # newline — and checks the rest: indentation and charset stay findings.
+    - name: editorconfig
+      tags: [gates, format]
+      glob: "*"
+      run: "{gates} editorconfig-checker --fix {staged_files}"
+
+    # Shell is selected by MIME type, not by extension: an extensionless bin/ script
+    # carries none, and a glob would have to name every one of them. lefthook reads the
+    # shebang instead.
+    - name: shellcheck
+      tags: [gates, shell]
+      file_types: ["text/x-shellscript"]
+      run: "{gates} shellcheck -x {staged_files}"
+
+    # A file meant to be *sourced* has no shebang, and then its type is text/plain. It
+    # needs the dialect stated, which is why this is a job of its own: -s bash is wrong
+    # for the scripts above, whose shebang decides. lefthook ANDs its filters, so a
+    # MIME-or-glob union cannot be one job. .bats belongs here for the same reason —
+    # shellcheck reads `@test "name" { … }` as an ordinary function definition.
+    - name: shellcheck-sourced
+      tags: [gates, shell]
+      glob: "*.{bash,bats}"
+      run: "{gates} shellcheck -x -s bash {staged_files}"
+
+    # -i 4 is the SSOT for shell style; .editorconfig deliberately carries no indent_style
+    # (style belongs to the formatters).
+    - name: shfmt
+      tags: [gates, shell, format]
+      file_types: ["text/x-shellscript"]
+      run: "{gates} shfmt -w -i 4 {staged_files}"
+
+    # zsh is the macOS login shell, and shellcheck refuses the dialect. `zsh -n` is the
+    # interpreter's own parser — a syntax gate, not a linter.
+    - name: zsh-syntax
+      tags: [gates, shell]
+      glob: "*.zsh"
+      run: "{gates} zsh -n {staged_files}"
+
+    # Without --strict: which finding fails is the repository's .yamllint to say, per
+    # rule, as `level: error`. A second severity knob here would overrule it.
+    - name: yamllint
+      tags: [gates, yaml]
+      glob: "*.{yml,yaml}"
+      run: "{gates} yamllint {staged_files}"
+
+    # Structure against the SchemaStore definitions check-jsonschema vendors. They
+    # complement actionlint rather than duplicate it: this one knows which keys may
+    # appear where, the other knows what the values mean.
+    - name: workflow-schema
+      tags: [gates, ci]
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: "{gates} check-jsonschema --builtin-schema vendor.github-workflows {staged_files}"
+
+    - name: dependabot-schema
+      tags: [gates, ci]
+      glob: ".github/dependabot.{yml,yaml}"
+      run: "{gates} check-jsonschema --builtin-schema vendor.dependabot {staged_files}"
+
+    # The gitlab-ci transform resolves `!reference` tags, which the plain YAML loader
+    # rejects.
+    - name: gitlab-ci-schema
+      tags: [gates, ci]
+      glob: ".gitlab-ci.{yml,yaml}"
+      run: "{gates} check-jsonschema --builtin-schema vendor.gitlab-ci --data-transform gitlab-ci {staged_files}"
+
+    # Workflow semantics — expressions, runner labels, action inputs.
+    - name: actionlint
+      tags: [gates, ci]
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: "{gates} actionlint {staged_files}"
+
+    # Compose semantics (key order, name field) — complementary to yamllint.
+    - name: dclint
+      tags: [gates, compose]
+      glob: "*compose*.{yml,yaml}"
+      run: "{gates} dclint --fix {staged_files}"
+
+    # `*` crosses `/` here and matches the empty string, so one pattern per suffix covers
+    # a recipe at the root and in any directory. No `**/` prefix, which would require a
+    # directory, and no `*.Containerfile`, which insists on a dot that
+    # `container/Containerfile` has nowhere to put.
+    - name: hadolint
+      tags: [gates, container]
+      glob: "{*Containerfile,*Dockerfile,*.dockerfile}"
+      run: "{gates} hadolint {staged_files}"
+
+    # Line wrapping is left as written: reflowed prose turns a one-word edit into a
+    # paragraph-sized diff. --number keeps ordered lists numbered as written.
+    - name: mdformat
+      tags: [gates, markdown, format]
+      glob: "*.md"
+      run: "{gates} mdformat --number {staged_files}"
+
+    # jq per file, from the image's wrapper: one jq call over all of them would not say
+    # which file failed.
+    - name: json
+      tags: [gates, json]
+      glob: "*.json"
+      run: "{gates} check-json {staged_files}"
+
+    # TOML. --no-schema keeps the lint offline: taplo otherwise fetches schemas from a
+    # catalog at run time, and a gate whose verdict depends on the network is not one.
+    - name: taplo-lint
+      tags: [gates, toml]
+      glob: "*.toml"
+      run: "{gates} taplo lint --no-schema {staged_files}"
+
+    - name: taplo-fmt
+      tags: [gates, toml, format]
+      glob: "*.toml"
+      run: "{gates} taplo fmt {staged_files}"
+
+    - name: xmllint
+      tags: [gates, xml]
+      glob: "*.{xml,svg}"
+      run: "{gates} xmllint --noout {staged_files}"
+
+    # The consumer's lefthook.yml against the invariants above — they are a schema in the
+    # image, not a comment. A comment does not survive the edit that ignores it.
+    - name: lefthook-invariants
+      tags: [gates, lefthook]
+      glob: "lefthook.yml"
+      run: "{gates} check-lefthook {staged_files}"
+
+    # A file starting with #! must be executable, and an executable file must start with
+    # #!. The mode comes from git, not from the bind mount — see the wrapper.
+    - name: shebang-exec-match
+      tags: [gates]
+      glob: "*"
+      run: "{gates} shebang-exec-match {staged_files}"
+
+    # Binary artefacts by type, not by size. The glob decides what counts.
+    - name: artifact-guard
+      tags: [gates]
+      glob: "*.{jar,so,a,o,elf,bin,exe,dll,class,pyc}"
+      run: "{gates} artifact-guard {staged_files}"
+
+    # git-native, hence no template: git is part of the host floor. `--cached` asks the
+    # index against HEAD — what actually goes into the commit — and reports conflict
+    # markers as well as whitespace errors.
+    - name: merge-markers
+      tags: [gates]
+      run: git diff --cached --check
+
+    # The staged change only; a range scan is the CI's business. gitleaks needs no
+    # baseline to maintain. `git --pre-commit --staged` is what `protect --staged` became
+    # in 8.19, where `protect` was deprecated.
+    - name: gitleaks
+      tags: [gates, secrets]
+      run: "{gates} gitleaks git --pre-commit --staged --redact --no-banner"
+
+commit-msg:
+  jobs:
+    - name: gitlint
+      tags: [gates, commit]
+      run: "{gates} gitlint --msg-filename {1}"

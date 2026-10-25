@@ -1,0 +1,17 @@
+# .editorconfig — whitespace hygiene only.
+#
+# Deliberately NO syntax/style rules (indent_size, indent_style): those belong to the
+# dedicated formatters (shfmt, clang-format, perltidy, black, gersemi, yamllint …).
+# A second place for them violates SPOT and drifts apart from the formatter.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Markdown: trailing whitespace can be a hard line break — hygiene exception.
+[*.md]
+trim_trailing_whitespace = false

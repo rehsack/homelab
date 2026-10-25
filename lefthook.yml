@@ -1,0 +1,46 @@
+# lefthook.yml — homelab
+#
+# The local barrier: run the gates before a commit instead of letting a later CI be the
+# linter.
+#
+# The base contract is copied, not fetched: lefthook/base.yml is lefthook-qa-gates'
+# lefthook/base.yml at v0.2.0 (blob 153c125), kept verbatim. A `remotes:` fetch would make
+# every CI run depend on GitHub and let a moved tag change the gates unseen; a copy turns
+# each contract change into a diff in the bump commit. Bump: replace the file, the version
+# above and the image tag of the `gates` service in helpers/docker-compose.yml together
+# (`vX.Y.Z` ↔ `X.Y`). Adjustments go here, never into the copy.
+#
+# What stays here is what only this repository knows: the AsciiDoc domain, each tool
+# behind a template of its own.
+#
+# INVARIANT — no container reference in this file. Jobs name tools; the {template}
+# placeholders decide where those come from:
+#   empty (as below)             → the tool runs natively from PATH.
+#   filled in lefthook-local.yml → the tool runs in a helpers/ container (developer case,
+#                                  see helpers/README.md, "QA fleet").
+# A template expands to a *prefix* ending before the tool name.
+
+min_version: 2.2.2
+
+extends:
+  - lefthook/base.yml
+
+templates:
+  adoc: ""
+  py-srv: ""
+
+pre-commit:
+  jobs:
+    - name: adoc-validate
+      tags: [adoc]
+      glob: "*.adoc"
+      run: "{adoc} validate -i {staged_files} --strict"
+
+    # asciidoc-linter publishes neither a PyPI package nor a tag — pinned by commit.
+    - name: asciidoc-linter
+      tags: [adoc]
+      glob: "*.adoc"
+      run: >-
+        {py-srv} uvx -q
+        --from git+https://github.com/docToolchain/asciidoc-linter@ea57b2904960cd009e41acfb1fda50c5f08bf7b2
+        asciidoc-linter --format plain {staged_files}

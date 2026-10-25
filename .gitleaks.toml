@@ -1,0 +1,7 @@
+# gitleaks — built-in ruleset. Add deliberate exceptions as [allowlist] — but then with
+# at least one check (paths/regexes/stopwords), otherwise loading breaks. Typical
+# allowlist paths per repo: vendored/3rd-party trees (submodules), proprietary blobs —
+# not our code, else false positives from vendor example keys.
+
+[extend]
+useDefault = true

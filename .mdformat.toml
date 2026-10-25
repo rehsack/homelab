@@ -1,0 +1,4 @@
+# .mdformat.toml — how mdformat formats; which files it checks is the contract's business
+# (lefthook/base.yml). Width matches .yamllint. Tables stay padded: aligned columns keep
+# them readable in ${PAGER}.
+wrap = 120

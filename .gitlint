@@ -1,0 +1,12 @@
+# gitlint — Conventional Commits gate.
+[general]
+# Enforce CC types + format in the title.
+contrib=contrib-title-conventional-commits
+# A body isn't mandatory on every commit (Beams: the Why goes in when needed).
+ignore=body-is-missing
+
+[title-max-length]
+line-length=72
+
+[body-max-line-length]
+line-length=100

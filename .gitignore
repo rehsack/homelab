@@ -15,3 +15,7 @@ keys.txt
 
 # generated talos configs (regenerated from sources, not versioned)
 /talos/.gen/
+
+# per-developer QA wiring (see helpers/README.md, "QA fleet")
+lefthook-local.yml
+helpers/.env

@@ -20,19 +20,14 @@ wird gestrichen, nicht abgehakt; die Historie steht in Git.
 
 === Als Nächstes
 
-QA-Gates vervollständigen::
-Die allgemeine QA-Flotte (yamllint, gitleaks, gitlint …) kommt aus
-`rehsack/lefthook-qa-gates` (`v0.1.0`). Bislang prüft `lefthook.yml` nur AsciiDoc
-(`adoc validate`, `asciidoc-linter`). gitleaks braucht eine `.gitleaks.toml` mit
-Allowlist für die auskommentierten Talos-Beispielwerte aus `talosctl gen config`
-(`# … example (do not use in production!)`) — sonst schlagen 11 Fehlalarme an.
-Auslöser;; jetzt.
-
 Repository veröffentlichen::
 Push nach GitHub *und* Forgejo. Die bestehende Historie reicht: SOPS+age seit dem
-ersten Commit (`48d2504`), `gitleaks git` über alle 41 Commits findet am 2026-10-23 keine
-echten Klartext-Secrets, nur die genannten Beispielwerte.
-Auslöser;; gitleaks-Gate aktiv.
+ersten Commit (`48d2504`); `gitleaks git` über alle 41 Commits fand am 2026-10-23 keine
+echten Klartext-Secrets, nur 11 auskommentierte Talos-Beispielwerte aus
+`talosctl gen config` (`# … example (do not use in production!)`). Das pre-commit-Gate
+sieht nur Gestagtes und trifft sie nicht; ein Range-Scan über die alte Historie (CI,
+`range-gates`) braucht dafür eine Allowlist in `.gitleaks.toml`.
+Auslöser;; jetzt — das gitleaks-Gate ist aktiv.
 
 Forgejo-Datenbank auf Block migrieren::
 Forgejo läuft mit SQLite auf `rook-cephfs` und verletzt damit ADR-H-009. Die PVC wird
