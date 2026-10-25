@@ -4,12 +4,11 @@ Stand: 2026-05-05
 
 ## Warum VIP von Anfang an?
 
-Ohne VIP zeigt `cluster.controlPlane.endpoint` auf die IP eines einzelnen Nodes.
-Das hat zwei Konsequenzen:
+Ohne VIP zeigt `cluster.controlPlane.endpoint` auf die IP eines einzelnen Nodes. Das hat zwei Konsequenzen:
 
 1. **Kein HA**: Fällt dieser Node aus, ist die K8s API unerreichbar
-2. **Nachträgliches Umstellen ist riskant**: Endpoint-Änderung auf laufendem Cluster
-   erfordert, dass die VIP bereits antwortet, bevor der Endpoint umgestellt wird
+2. **Nachträgliches Umstellen ist riskant**: Endpoint-Änderung auf laufendem Cluster erfordert, dass die VIP bereits
+   antwortet, bevor der Endpoint umgestellt wird
 
 ## Empfohlene Reihenfolge bei Neuinstallation
 
@@ -39,10 +38,10 @@ Das hat zwei Konsequenzen:
 
 ## IP-Bereichsplanung (Beispiel homelab)
 
-| Bereich | Verwendung |
-|---|---|
-| .1 | Gateway (FritzBox) |
-| .20–.199 | DHCP-Range (Nodes, Clients) |
+| Bereich   | Verwendung                            |
+| --------- | ------------------------------------- |
+| .1        | Gateway (FritzBox)                    |
+| .20–.199  | DHCP-Range (Nodes, Clients)           |
 | .200–.209 | Cilium LB-IPAM (Service LoadBalancer) |
 | .240–.249 | Virtual IPs (Talos VIP, ggf. weitere) |
 
@@ -78,10 +77,9 @@ kubectl config set-cluster <name> --server=https://<VIP>:6443
 
 ## Wichtig
 
-- **DHCP beibehalten**: `dhcp: true` in der Interface-Config. Die Node-IP kommt
-  weiterhin vom Netzwerk-DHCP-Server. Talos soll keine IPs selbst vergeben.
+- **DHCP beibehalten**: `dhcp: true` in der Interface-Config. Die Node-IP kommt weiterhin vom Netzwerk-DHCP-Server.
+  Talos soll keine IPs selbst vergeben.
 - **VIP ≠ Node-IP**: Die VIP ist eine zusätzliche IP, die zwischen CP Nodes wandert.
-- **talosconfig.endpoints**: Zeigt auf die VIP (für Management). `nodes` bleibt
-  die tatsächliche Node-IP (für node-spezifische Operationen).
-- **Repo = Source of Truth**: Jede Live-Änderung muss sofort in die YAML-Dateien
-  im Git-Repo zurückfließen.
+- **talosconfig.endpoints**: Zeigt auf die VIP (für Management). `nodes` bleibt die tatsächliche Node-IP (für
+  node-spezifische Operationen).
+- **Repo = Source of Truth**: Jede Live-Änderung muss sofort in die YAML-Dateien im Git-Repo zurückfließen.

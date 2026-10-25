@@ -6,10 +6,10 @@ set -euo pipefail
 
 readonly TOOLS=(
     talosctl
-    kubernetes-cli      # provides kubectl
+    kubernetes-cli # provides kubectl
     helm
     cilium-cli
-    keepassxc           # provides keepassxc-cli
+    keepassxc # provides keepassxc-cli
 )
 
 # --- preflight ---

@@ -2,63 +2,55 @@
 
 *Stand 30.05.2026 — Aktualisieren wenn sich CP-Topologie oder Patches-Struktur ändert.*
 
-Diese Doc deckt zwei verwandte Szenarien ab, die dieselbe Infrastruktur
-nutzen (`talos/`-Patches, SOPS-encrypted `secrets.yaml`, Image-Factory-Schematics):
+Diese Doc deckt zwei verwandte Szenarien ab, die dieselbe Infrastruktur nutzen (`talos/`-Patches, SOPS-encrypted
+`secrets.yaml`, Image-Factory-Schematics):
 
-1. **Initialer Bring-up oder Re-Provisionierung eines Knotens** — siehe
-   *Per-Node Bootstrap Runbooks* weiter unten. Anwendungsfall: erstes Mal
-   Talos installieren, oder einen Node nach Hardware-Tausch wiederherstellen.
-2. **Cluster-Level Recovery** nach Verlust des Control Plane — siehe
-   *Pfad 1 / 2 / 3* weiter unten. Anwendungsfall: f5a-01 fällt aus.
+1. **Initialer Bring-up oder Re-Provisionierung eines Knotens** — siehe *Per-Node Bootstrap Runbooks* weiter unten.
+   Anwendungsfall: erstes Mal Talos installieren, oder einen Node nach Hardware-Tausch wiederherstellen.
+2. **Cluster-Level Recovery** nach Verlust des Control Plane — siehe *Pfad 1 / 2 / 3* weiter unten. Anwendungsfall:
+   f5a-01 fällt aus.
 
 Beide Szenarien teilen sich die gleichen Voraussetzungen.
 
 ## Cluster-Level Recovery — Szenario
 
-f5a-01 (aktuell einziger Control Plane) fällt katastrophal aus, MS-A2 ist
-gesund und hat in seiner Worker-Rolle die Hälfte der Ceph-OSDs gehostet.
-Ziel: Cluster auf MS-A2 als neuen alleinigen CP wiederherstellen, ohne neue
-Hardware bestellen zu müssen.
+f5a-01 (aktuell einziger Control Plane) fällt katastrophal aus, MS-A2 ist gesund und hat in seiner Worker-Rolle die
+Hälfte der Ceph-OSDs gehostet. Ziel: Cluster auf MS-A2 als neuen alleinigen CP wiederherstellen, ohne neue Hardware
+bestellen zu müssen.
 
-Dieser Pfad ist eine Folge der bewussten Phase-2-Entscheidung "MS-A2 als
-worker" — siehe `CLAUDE.md` → Node Expansion.
+Dieser Pfad ist eine Folge der bewussten Phase-2-Entscheidung "MS-A2 als worker" — siehe `CLAUDE.md` → Node Expansion.
 
 ## Voraussetzungen vor Disaster
 
 Müssen *vor* dem Incident bestehen, sonst ist Recovery zumindest aufwändiger:
 
-- **Talos-Secrets-Bundle** vom ursprünglichen Cluster-Init erhalten (typisch
-  `talos/secrets.yaml`, SOPS-encrypted im Repo).
-- **Age-Schlüssel** für SOPS verfügbar (`~/.config/sops/age/keys.txt`),
-  *off-cluster* gespeichert.
-- **Repo `homelab/`** mit aktuellem Manifest-Stand verfügbar (Git lokal oder
-  von einem externen Forgejo-Mirror clonebar).
-- **Ceph failure-domain ist `host`** (nicht `osd`) — sonst sind nicht garantiert
-  vollständige Daten-Repliken auf MS-A2. Diese Transition gehört zur
-  MS-A2-Inbetriebnahme, nicht aufschiebbar.
+- **Talos-Secrets-Bundle** vom ursprünglichen Cluster-Init erhalten (typisch `talos/secrets.yaml`, SOPS-encrypted im
+  Repo).
+- **Age-Schlüssel** für SOPS verfügbar (`~/.config/sops/age/keys.txt`), *off-cluster* gespeichert.
+- **Repo `homelab/`** mit aktuellem Manifest-Stand verfügbar (Git lokal oder von einem externen Forgejo-Mirror
+  clonebar).
+- **Ceph failure-domain ist `host`** (nicht `osd`) — sonst sind nicht garantiert vollständige Daten-Repliken auf MS-A2.
+  Diese Transition gehört zur MS-A2-Inbetriebnahme, nicht aufschiebbar.
 
-Wenn auch nur eines davon fehlt → Pfad 3 ist möglicherweise die einzige
-Option.
+Wenn auch nur eines davon fehlt → Pfad 3 ist möglicherweise die einzige Option.
 
 ## Per-Node Bootstrap Runbooks
 
 Diese Runbooks dienen zwei Zwecken:
+
 1. **Initialer Bring-up** eines Knotens vom Image-Factory-USB-Stick aus.
 2. **Re-Provisionierung** nach Hardware-Tausch oder als Teil eines Recovery-Pfads.
 
-Voraussetzungen wie oben. Schematic-IDs sind per-node in
-`talos/<node>-schematics.yaml` gepinnt; gleiche Extension-Sets ergeben denselben
-Hash (content-addressed), divergieren aber, sobald ein Node eigene Kernel-Args
-braucht (z.B. ms-a2-01 mit dem `usb-storage`-UAS-Quirk für die RTL9210-Bridge).
+Voraussetzungen wie oben. Schematic-IDs sind per-node in `talos/<node>-schematics.yaml` gepinnt; gleiche Extension-Sets
+ergeben denselben Hash (content-addressed), divergieren aber, sobald ein Node eigene Kernel-Args braucht (z.B. ms-a2-01
+mit dem `usb-storage`-UAS-Quirk für die RTL9210-Bridge).
 
 ### f5a-01 (Control Plane, single-node Cluster-Init)
 
-**Hardware**: Acemagic F5A (AMD HX370). Boot vom externen USB-C-SSD
-(Pyrite 2400, 512 GB). NIC `enp197s0` am Switch.
+**Hardware**: Acemagic F5A (AMD HX370). Boot vom externen USB-C-SSD (Pyrite 2400, 512 GB). NIC `enp197s0` am Switch.
 
-**Patches**: `talos/f5a-01-machine.yaml`, `talos/f5a-01-volumes.yaml`,
-`talos/homelab-endpoint.yaml`, `talos/homelab-k8s-images.yaml` (CP-only),
-`talos/homelab-cilium.yaml`.
+**Patches**: `talos/f5a-01-machine.yaml`, `talos/f5a-01-volumes.yaml`, `talos/homelab-endpoint.yaml`,
+`talos/homelab-k8s-images.yaml` (CP-only), `talos/homelab-cilium.yaml`.
 
 **Schematic**: `talos/f5a-01-schematics.yaml`.
 
@@ -111,26 +103,23 @@ mv /tmp/f5a-01.yaml talos/.gen/controlplane.yaml
 git add talos/secrets.yaml talos/talosconfig.yaml
 ```
 
-Danach (separate Runbooks): Cilium installieren, dann Rook-Ceph,
-dann Workloads — siehe `infrastructure/` und `applications/`.
+Danach (separate Runbooks): Cilium installieren, dann Rook-Ceph, dann Workloads — siehe `infrastructure/` und
+`applications/`.
 
 ### ms-a2-01 (Worker, joining existing cluster)
 
-**Hardware**: Minisforum MS-A2 (Ryzen 9 9955HX, Zen 5 Fire Range).
-Boot vom Image-Factory-USB-Stick (SanDisk 3.2Gen1). Install-Target ist
-externes USB-C-NVMe-Gehäuse (ASMedia-Bridge, am *non-USB4* Type-C-Port —
-der USB4-Port pendelt mit dieser Bridge in einer Renegotiation-Loop).
-NIC `enp3s0` am Switch.
+**Hardware**: Minisforum MS-A2 (Ryzen 9 9955HX, Zen 5 Fire Range). Boot vom Image-Factory-USB-Stick (SanDisk 3.2Gen1).
+Install-Target ist externes USB-C-NVMe-Gehäuse (ASMedia-Bridge, am *non-USB4* Type-C-Port — der USB4-Port pendelt mit
+dieser Bridge in einer Renegotiation-Loop). NIC `enp3s0` am Switch.
 
-**Pre-flight**: USB-C-NVMe-Gehäuse muss stabil enumeriert sein (vorher
-Port-Wechsel testen, falls dmesg-Disconnects am Bildschirm sichtbar).
+**Pre-flight**: USB-C-NVMe-Gehäuse muss stabil enumeriert sein (vorher Port-Wechsel testen, falls dmesg-Disconnects am
+Bildschirm sichtbar).
 
-**Patches**: `talos/ms-a2-01-machine.yaml`, `talos/ms-a2-01-hostname.yaml`,
-`talos/ms-a2-01-volumes.yaml`, `talos/homelab-cilium.yaml`.
+**Patches**: `talos/ms-a2-01-machine.yaml`, `talos/ms-a2-01-hostname.yaml`, `talos/ms-a2-01-volumes.yaml`,
+`talos/homelab-cilium.yaml`.
 
-**Schematic**: `talos/ms-a2-01-schematics.yaml` (eigener Hash —
-`usb-storage.quirks=0bda:9210:u` für die RTL9210-Boot-Bridge, weicht damit
-bewusst von f5a-01 ab; nicht mehr derselbe content-addressed Hash).
+**Schematic**: `talos/ms-a2-01-schematics.yaml` (eigener Hash — `usb-storage.quirks=0bda:9210:u` für die
+RTL9210-Boot-Bridge, weicht damit bewusst von f5a-01 ab; nicht mehr derselbe content-addressed Hash).
 
 ```bash
 # 0) USB-Stick mit der Factory-ISO am MS-A2 booten, Maintenance Mode verifizieren:
@@ -248,28 +237,24 @@ mv /tmp/ms-a2-01.yaml talos/.gen/ms-a2-01.yaml
 ```
 
 Danach (separate, nicht Teil dieses Runbooks):
-- Ceph: `failure domain` von `osd` auf `host` umstellen (CephCluster-CR
-  patchen). Die zwei NVMe auf MS-A2 werden über `deviceFilter: "^nvme"`
-  automatisch als OSDs adoptiert.
+
+- Ceph: `failure domain` von `osd` auf `host` umstellen (CephCluster-CR patchen). Die zwei NVMe auf MS-A2 werden über
+  `deviceFilter: "^nvme"` automatisch als OSDs adoptiert.
 - (Phase 3) MS-A2 zur CP-Rolle promoten — koordiniert mit SER6-Beitritt.
 
 ### SER6 Pro (Worker → CP-Promotion, Phase 3)
 
-Wenn SER6 ankommt: zuerst als Worker einbinden (analog zu ms-a2-01),
-dann *koordiniert* mit MS-A2 zur Control Plane befördern, sodass etcd
-in einem Schritt von 1 → 3 Membern wächst (kein 2-Member-Quorum-Loch).
+Wenn SER6 ankommt: zuerst als Worker einbinden (analog zu ms-a2-01), dann *koordiniert* mit MS-A2 zur Control Plane
+befördern, sodass etcd in einem Schritt von 1 → 3 Membern wächst (kein 2-Member-Quorum-Loch).
 
-Detail-Runbook folgt sobald die Hardware da ist und der MachineConfig-Patch
-geschrieben ist.
+Detail-Runbook folgt sobald die Hardware da ist und der MachineConfig-Patch geschrieben ist.
 
 ## Pfad 1 — etcd-Snapshot Restore (empfohlen, sobald Snapshots laufen)
 
-**Status heute (29.05.2026)**: Snapshot-Automatisierung steht noch aus, daher
-ist Pfad 2 vorerst der reale Pfad. Diese Sektion beschreibt das Soll-Verfahren,
-sobald die TODO-Liste am Ende abgearbeitet ist.
+**Status heute (29.05.2026)**: Snapshot-Automatisierung steht noch aus, daher ist Pfad 2 vorerst der reale Pfad. Diese
+Sektion beschreibt das Soll-Verfahren, sobald die TODO-Liste am Ende abgearbeitet ist.
 
-**Zusätzliche Voraussetzung**: aktueller etcd-Snapshot (`< 24 h alt`), off-cluster
-gespeichert.
+**Zusätzliche Voraussetzung**: aktueller etcd-Snapshot (`< 24 h alt`), off-cluster gespeichert.
 
 Grober Ablauf (Details: Talos Disaster-Recovery-Doku):
 
@@ -297,9 +282,8 @@ Erwarteter Aufwand: 1–2 h.
 
 ## Pfad 2 — Bootstrap + Git-Replay + Ceph-Recovery (ohne Snapshot)
 
-Aktuell der realistische Pfad. Verliert K8s-State (Workload-Definitionen,
-RBAC, Secrets), aber Daten in CephFS bleiben erhalten — wenn die OSDs
-adoptiert werden können.
+Aktuell der realistische Pfad. Verliert K8s-State (Workload-Definitionen, RBAC, Secrets), aber Daten in CephFS bleiben
+erhalten — wenn die OSDs adoptiert werden können.
 
 ```bash
 # 1) MS-A2 in Maintenance Mode bringen.
@@ -338,79 +322,67 @@ Erwarteter Aufwand: halber Tag bis Tag, je nach Komplexität.
 
 ### Ceph-Reanimation (gemeinsam für Pfad 1 und 2)
 
-Die OSDs auf MS-A2 sind LVM-Volumes mit Rook-Metadaten. Sie müssen
-*adoptiert* werden, **nicht** wegformatiert:
+Die OSDs auf MS-A2 sind LVM-Volumes mit Rook-Metadaten. Sie müssen *adoptiert* werden, **nicht** wegformatiert:
 
-- Rook-CephCluster CR: `cleanupPolicy.confirmation` darf **nicht** gesetzt sein
-  (das würde die Adoption unterbinden und Daten wegwerfen).
-- Mon-DB neu aufbauen — die Original-Mons waren auf f5a-01 und sind weg. Rook
-  hat dafür eine "Mon-Quorum-Recovery"-Prozedur dokumentiert (Suchwort:
-  *"restore quorum from single mon"* oder *"adopt OSDs after Mon loss"*).
-- Vorher mit `rook-ceph-tools`-Pod den OSD-Tree inspizieren, um sicher zu sein
-  dass die OSDs intakt sind.
+- Rook-CephCluster CR: `cleanupPolicy.confirmation` darf **nicht** gesetzt sein (das würde die Adoption unterbinden und
+  Daten wegwerfen).
+- Mon-DB neu aufbauen — die Original-Mons waren auf f5a-01 und sind weg. Rook hat dafür eine
+  "Mon-Quorum-Recovery"-Prozedur dokumentiert (Suchwort: *"restore quorum from single mon"* oder *"adopt OSDs after Mon
+  loss"*).
+- Vorher mit `rook-ceph-tools`-Pod den OSD-Tree inspizieren, um sicher zu sein dass die OSDs intakt sind.
 
-Wegen der Komplexität dieses Schrittes ist die Trockenübung (siehe TODO unten)
-besonders wichtig.
+Wegen der Komplexität dieses Schrittes ist die Trockenübung (siehe TODO unten) besonders wichtig.
 
 ## Pfad 3 — Worst Case: Cluster komplett neu
 
-Wenn MS-A2's OSDs *auch* unbrauchbar sind (z.B. Stromschaden, der beide Nodes
-erwischt hat), oder die Voraussetzungen aus den ersten Abschnitten nicht
-erfüllbar sind:
+Wenn MS-A2's OSDs *auch* unbrauchbar sind (z.B. Stromschaden, der beide Nodes erwischt hat), oder die Voraussetzungen
+aus den ersten Abschnitten nicht erfüllbar sind:
 
 - Cluster neu bootstrappen.
 - Workload-Daten in CephFS sind verloren, sofern kein externes Backup existiert.
 - Manifests aus Git restorabel.
 
-Dies ist das Szenario, das wir durch Pfad 1 und 2 *vermeiden* — aber es ist
-realistisch genug, dass externe Backups der wichtigsten Workload-Daten
-(z.B. Forgejo-Repos via `git push` auf einen externen Mirror) sinnvoll sind.
+Dies ist das Szenario, das wir durch Pfad 1 und 2 *vermeiden* — aber es ist realistisch genug, dass externe Backups der
+wichtigsten Workload-Daten (z.B. Forgejo-Repos via `git push` auf einen externen Mirror) sinnvoll sind.
 
 ## Warum MS-A2's OSDs eine vollständige Datenkopie halten
 
-Konfiguration nach MS-A2-Beitritt: `size: 2`, `failure domain: host`, 2 Hosts.
-Jede Placement Group hat genau eine Replika pro Host. f5a-01-Verlust →
-MS-A2 hat eine vollständige Kopie aller Daten.
+Konfiguration nach MS-A2-Beitritt: `size: 2`, `failure domain: host`, 2 Hosts. Jede Placement Group hat genau eine
+Replika pro Host. f5a-01-Verlust → MS-A2 hat eine vollständige Kopie aller Daten.
 
-Gegenbeispiel: bei `failure domain: osd` (heute auf Single-Host) könnten
-beide Repliken einer PG auf zwei OSDs *desselben* Hosts liegen — host-Verlust
-würde dann beide treffen. Genau deshalb ist die Transition zu `host`-Domain
+Gegenbeispiel: bei `failure domain: osd` (heute auf Single-Host) könnten beide Repliken einer PG auf zwei OSDs
+*desselben* Hosts liegen — host-Verlust würde dann beide treffen. Genau deshalb ist die Transition zu `host`-Domain
 *nicht* aufschiebbar, sobald MS-A2 läuft.
 
 ## Operative Recovery — Container-Image-Cache-Korruption nach Disk-Failure
 
-**Szenario**: Eine vorübergehende Boot-Disk-Failure (z.B. USB-NVMe-Bridge zickt,
-sda4 in EIO, XFS-Recovery klärt Metadata aber Daten-Blöcke der OSI-Layer-Files
-sind partiell ungeschrieben) hinterlässt korrupte Container-Image-Blobs im
-containerd-Content-Store. Pods scheitern mit `exec format error` (ENOEXEC) oder
-sporadischem EIO beim Container-Start, *obwohl* dmesg keine neuen Disk-Errors
-mehr zeigt und der `image ls` das erwartete Image listet. Der `sha256`-Hash des
-Blobs stimmt im containerd-Index, weil der Hash beim Write-Time gegen Memory
-geprüft wurde — die später beobachtete Diskrepanz ist eine Block-Layer-Realität
-ohne Buchhaltung in containerd.
+**Szenario**: Eine vorübergehende Boot-Disk-Failure (z.B. USB-NVMe-Bridge zickt, sda4 in EIO, XFS-Recovery klärt
+Metadata aber Daten-Blöcke der OSI-Layer-Files sind partiell ungeschrieben) hinterlässt korrupte Container-Image-Blobs
+im containerd-Content-Store. Pods scheitern mit `exec format error` (ENOEXEC) oder sporadischem EIO beim
+Container-Start, *obwohl* dmesg keine neuen Disk-Errors mehr zeigt und der `image ls` das erwartete Image listet. Der
+`sha256`-Hash des Blobs stimmt im containerd-Index, weil der Hash beim Write-Time gegen Memory geprüft wurde — die
+später beobachtete Diskrepanz ist eine Block-Layer-Realität ohne Buchhaltung in containerd.
 
 **Diagnose-Schritte:**
 
-1. Pod-Container-Status anschauen — welche Container im Pod failen, welche laufen?
-   Wenn nur EIN Sidecar versagt (z.B. csi-snapshotter), während andere Container
-   im selben Pod laufen, ist es nicht "die ganze Image-Familie kaputt", sondern
-   ein einzelnes Image.
+1. Pod-Container-Status anschauen — welche Container im Pod failen, welche laufen? Wenn nur EIN Sidecar versagt (z.B.
+   csi-snapshotter), während andere Container im selben Pod laufen, ist es nicht "die ganze Image-Familie kaputt",
+   sondern ein einzelnes Image.
 
-2. Pull-Timestamp des verdächtigen Images vergleichen — Pull-Time in der bekannten
-   Disk-Failure-Phase ist die rauchende Pistole:
+2. Pull-Timestamp des verdächtigen Images vergleichen — Pull-Time in der bekannten Disk-Failure-Phase ist die rauchende
+   Pistole:
+
    ```bash
    talosctl image ls -n <node> | grep <image>
    # Falls Pull-Zeitstempel mit Failure-Phase überlappt → korrupter Cache hochwahrscheinlich
    ```
 
-3. Cross-Check gegen einen *gesunden* Node desselben Clusters — wenn dort dasselbe
-   Image (gleicher sha256) ohne Issues läuft, ist's definitiv ein Node-lokaler
-   Cache-Issue, nicht ein generelles Image-Problem.
+3. Cross-Check gegen einen *gesunden* Node desselben Clusters — wenn dort dasselbe Image (gleicher sha256) ohne Issues
+   läuft, ist's definitiv ein Node-lokaler Cache-Issue, nicht ein generelles Image-Problem.
 
 ### Eskalations-Stufen (least to most disruptive)
 
-**Stufe 1 — Reference-Removal + Force-Pull** (surgical Probe für ein einzelnes
-Image, *funktioniert nicht immer*):
+**Stufe 1 — Reference-Removal + Force-Pull** (surgical Probe für ein einzelnes Image, *funktioniert nicht immer*):
 
 ```bash
 talosctl image remove <image:tag> -n <node>
@@ -418,23 +390,18 @@ talosctl image remove <image>@sha256:<digest> -n <node>
 talosctl image pull <image:tag> -n <node>
 ```
 
-Erwartung: wenn der Pull instant zurückkommt (z.B. <1s für 40 MB), ist der
-orphan Blob noch im Content-Store und containerd re-linked nur Tag+Digest auf
-denselben kaputten Bytes. Echte fresh-Download dauert proportional zur
-Image-Größe. **Wenn instant: zur Stufe 2 — aber vorher batch-entwirren, siehe
-unten.**
+Erwartung: wenn der Pull instant zurückkommt (z.B. \<1s für 40 MB), ist der orphan Blob noch im Content-Store und
+containerd re-linked nur Tag+Digest auf denselben kaputten Bytes. Echte fresh-Download dauert proportional zur
+Image-Größe. **Wenn instant: zur Stufe 2 — aber vorher batch-entwirren, siehe unten.**
 
 Ressourcen-Impact: keine. Risiko: keine.
 
-**Stufe 1b — Batch-Vorbereitung VOR dem Reboot** (wichtiger Schritt, sonst
-Reboot-Loop):
+**Stufe 1b — Batch-Vorbereitung VOR dem Reboot** (wichtiger Schritt, sonst Reboot-Loop):
 
-Pull-Timestamps aller Images mit der Disk-Failure-Phase abgleichen. Verdächtig
-ist alles, dessen `CREATED`-Timestamp in der Failure-Phase liegt *oder kurz
-davor* (Layer-Extraktion bei großen Images kann mehrere Sekunden bis Minuten
-laufen und Failure-Window-Overlap erzeugen, auch wenn der Pull-Befehl vorher
-startete). Großes Image mit Pull-Start 2 Minuten vor Failure = wahrscheinlich
-mitten in der Extraktion zum Failure-Zeitpunkt → korrupt-verdächtig.
+Pull-Timestamps aller Images mit der Disk-Failure-Phase abgleichen. Verdächtig ist alles, dessen `CREATED`-Timestamp in
+der Failure-Phase liegt *oder kurz davor* (Layer-Extraktion bei großen Images kann mehrere Sekunden bis Minuten laufen
+und Failure-Window-Overlap erzeugen, auch wenn der Pull-Befehl vorher startete). Großes Image mit Pull-Start 2 Minuten
+vor Failure = wahrscheinlich mitten in der Extraktion zum Failure-Zeitpunkt → korrupt-verdächtig.
 
 ```bash
 # Beispiel: Failure-Phase 11:42-12:07 → Verdächtig ist alles 11:39-12:10
@@ -449,22 +416,18 @@ for ref in <image1:tag> <image2:tag> ... <image1>@<digest> <image2>@<digest> ...
 done
 ```
 
-Verifikation per `talosctl image ls | grep <substring>` — sollte leer sein für
-alle behandelten Images. **Erst dann zur Stufe 2 (Reboot).** containerd's
-Boot-GC räumt *alle* unreferenzierten Blobs auf einmal weg, daher ein Reboot
-genügt für N Images, vorausgesetzt deren Refs sind vorher alle entfernt.
+Verifikation per `talosctl image ls | grep <substring>` — sollte leer sein für alle behandelten Images. **Erst dann zur
+Stufe 2 (Reboot).** containerd's Boot-GC räumt *alle* unreferenzierten Blobs auf einmal weg, daher ein Reboot genügt für
+N Images, vorausgesetzt deren Refs sind vorher alle entfernt.
 
-Resourcen-Impact: keine (außer Tipparbeit). Risiko: keine. Wenn versehentlich
-auch ein *sauberes* Image entfernt wird, kostet das nur einen Re-Pull beim
-nächsten Pod-Schedule.
+Resourcen-Impact: keine (außer Tipparbeit). Risiko: keine. Wenn versehentlich auch ein *sauberes* Image entfernt wird,
+kostet das nur einen Re-Pull beim nächsten Pod-Schedule.
 
 **Stufe 2 — Node-Reboot, containerd-GC** (preserves /var/log, ~2 Min Pause):
 
-**Vorbedingung**: Stufe 1b (Batch-Reference-Removal aller Verdächtigen) muss
-durchgeführt sein. Sonst räumt der Reboot-GC nur die Blobs weg, deren
-Referenzen wir explizit entfernt haben — andere korrupte Layer bleiben
-unverändert und tauchen beim nächsten Pod-Schedule wieder als Failure auf =
-Reboot-Loop.
+**Vorbedingung**: Stufe 1b (Batch-Reference-Removal aller Verdächtigen) muss durchgeführt sein. Sonst räumt der
+Reboot-GC nur die Blobs weg, deren Referenzen wir explizit entfernt haben — andere korrupte Layer bleiben unverändert
+und tauchen beim nächsten Pod-Schedule wieder als Failure auf = Reboot-Loop.
 
 ```bash
 talosctl reboot -n <node>
@@ -473,18 +436,15 @@ talosctl reboot -n <node>
 # nächsten Pod-Schedule pullt echten neuen Content
 ```
 
-Ressourcen-Impact: Node kurz NotReady, Pods werden anderswo rescheduled bzw.
-restartet beim Comeback. **`/var/log` bleibt erhalten** — wichtig für
-forensische Analyse späterer Incidents. Container-Image-Cache bleibt
-weitgehend erhalten (nur orphaned Blobs werden gepurgt).
+Ressourcen-Impact: Node kurz NotReady, Pods werden anderswo rescheduled bzw. restartet beim Comeback. **`/var/log`
+bleibt erhalten** — wichtig für forensische Analyse späterer Incidents. Container-Image-Cache bleibt weitgehend erhalten
+(nur orphaned Blobs werden gepurgt).
 
-Risiko: gering. Wenn etwas anderes auf dem Node im selben Zustand corruption
-hat (z.B. weitere Layer mehrerer Images), würde ein Reboot diese nicht
-adressieren — dann eskalieren.
+Risiko: gering. Wenn etwas anderes auf dem Node im selben Zustand corruption hat (z.B. weitere Layer mehrerer Images),
+würde ein Reboot diese nicht adressieren — dann eskalieren.
 
-`talosctl service containerd restart` als noch-leichtere Alternative ist
-**nicht verfügbar** (Talos-API: "service containerd doesn't support restart
-operation via API"). Reboot ist der billigste Weg, GC zu triggern.
+`talosctl service containerd restart` als noch-leichtere Alternative ist **nicht verfügbar** (Talos-API: "service
+containerd doesn't support restart operation via API"). Reboot ist der billigste Weg, GC zu triggern.
 
 **Stufe 3 — EPHEMERAL-Wipe** (last resort, *verliert /var/log*):
 
@@ -493,48 +453,39 @@ talosctl reset --system-labels-to-wipe EPHEMERAL --reboot -n <node>
 ```
 
 Was passiert:
+
 - `--graceful` (default): vorab cordon + drain
 - Talos schreibt Wipe-Direktive in META, rebootet
 - Boot-Sequence formatiert sda4 frisch (komplettes XFS), erzeugt leeres /var
-- Node kommt mit unveränderter Identity (Hostname, IP, K8s-Labels — alles in
-  STATE/META) zurück
-- kubelet pullt *alle* benötigten Images frisch nach (~5-15 Min je nach
-  Image-Volumen — typisch 2-3 GB für Rook-Ceph + Cilium + CSI-Familie)
+- Node kommt mit unveränderter Identity (Hostname, IP, K8s-Labels — alles in STATE/META) zurück
+- kubelet pullt *alle* benötigten Images frisch nach (~5-15 Min je nach Image-Volumen — typisch 2-3 GB für Rook-Ceph +
+  Cilium + CSI-Familie)
 - Rook reconciled von selbst, OSD-prepare läuft mit sauberem State
 
-Was *nicht* passiert: keine Re-Provision, kein Re-Bootstrap, kein Manuelles
-Re-Apply. Cluster-State (etcd) ist unberührt. Internal NVMes (Ceph-OSDs,
-Yocto-Scratch) sind nicht auf sda → unberührt.
+Was *nicht* passiert: keine Re-Provision, kein Re-Bootstrap, kein Manuelles Re-Apply. Cluster-State (etcd) ist
+unberührt. Internal NVMes (Ceph-OSDs, Yocto-Scratch) sind nicht auf sda → unberührt.
 
-Ressourcen-Impact: Node ~10 Min NotReady, ~3 GB Image-Re-Downloads, /var/log
-weg (deshalb last resort — Logs sind in einer Folge-Inzident-Analyse wertvoll).
+Ressourcen-Impact: Node ~10 Min NotReady, ~3 GB Image-Re-Downloads, /var/log weg (deshalb last resort — Logs sind in
+einer Folge-Inzident-Analyse wertvoll).
 
-Risiko: gering (cluster-state bleibt komplett), aber **verlierst die
-forensische Spur** zum Original-Incident. Wenn die Disk-Failure-Ursache nicht
-klar ist, BACKUP der relevanten /var/log-Dateien vor dem Wipe machen
-(via `talosctl read /var/log/<file>` oder rsync via Pod).
+Risiko: gering (cluster-state bleibt komplett), aber **verlierst die forensische Spur** zum Original-Incident. Wenn die
+Disk-Failure-Ursache nicht klar ist, BACKUP der relevanten /var/log-Dateien vor dem Wipe machen (via
+`talosctl read /var/log/<file>` oder rsync via Pod).
 
 ### Vorbeugung
 
-- USB-Boot-Hardware mit *stabilen* Bridge-Chips wählen (siehe
-  `doc/ssd-selection.md` für die Bridge-Chip-Liste und die ASMedia-Falle auf
-  AMD-USB4-Hosts).
-- USB-Boot über *USB-A* statt USB-C, wo möglich — umgeht den USB-C/USB4-
-  Negotiation-Pfad mit weniger Failure-Modes.
-- Nach einem überstandenen Disk-Failure-Incident: *präventiv* die in dieser
-  Zeit gepullten Images auf alle Nodes erneuern (Stufe 1+2 dieser Doc), bevor
-  Pods sie das nächste Mal anfassen. Spart Diagnose-Zeit beim nächsten Mal.
+- USB-Boot-Hardware mit *stabilen* Bridge-Chips wählen (siehe `doc/ssd-selection.md` für die Bridge-Chip-Liste und die
+  ASMedia-Falle auf AMD-USB4-Hosts).
+- USB-Boot über *USB-A* statt USB-C, wo möglich — umgeht den USB-C/USB4- Negotiation-Pfad mit weniger Failure-Modes.
+- Nach einem überstandenen Disk-Failure-Incident: *präventiv* die in dieser Zeit gepullten Images auf alle Nodes
+  erneuern (Stufe 1+2 dieser Doc), bevor Pods sie das nächste Mal anfassen. Spart Diagnose-Zeit beim nächsten Mal.
 
 ## TODO (nach heute Abend, vor dem ersten realen Incident)
 
-- [ ] `talosctl etcd snapshot`-Automatisierung einrichten — Talos-Service oder
-      externer Cron-Job
-- [ ] Snapshots off-cluster persistieren — SOPS-encrypted im Repo, oder auf
-      FritzBox-USB, oder NAS
-- [ ] Rook-Ceph Mon-Topologie für 2-Host-Setup überdenken — aktuell vermutlich
-      alle 3 Mons auf f5a-01. Mindestens einer sollte auf MS-A2 wandern, sobald
-      Worker stabil läuft (Mon-Pod-Verteilung über `mon.allowMultiplePerNode:
-      false` und Anti-Affinity)
-- [ ] Pfad 2 einmal als Trockenübung durchspielen — gezielt f5a-01 herunterfahren
-      und die OSD-Adoption auf MS-A2 üben. Ein Recovery-Pfad ist nur verlässlich,
-      wenn er mindestens einmal manuell ausgeführt wurde.
+- [ ] `talosctl etcd snapshot`-Automatisierung einrichten — Talos-Service oder externer Cron-Job
+- [ ] Snapshots off-cluster persistieren — SOPS-encrypted im Repo, oder auf FritzBox-USB, oder NAS
+- [ ] Rook-Ceph Mon-Topologie für 2-Host-Setup überdenken — aktuell vermutlich alle 3 Mons auf f5a-01. Mindestens einer
+  sollte auf MS-A2 wandern, sobald Worker stabil läuft (Mon-Pod-Verteilung über `mon.allowMultiplePerNode:     false`
+  und Anti-Affinity)
+- [ ] Pfad 2 einmal als Trockenübung durchspielen — gezielt f5a-01 herunterfahren und die OSD-Adoption auf MS-A2 üben.
+  Ein Recovery-Pfad ist nur verlässlich, wenn er mindestens einmal manuell ausgeführt wurde.

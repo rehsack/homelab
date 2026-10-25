@@ -5,4 +5,3 @@
 apiVersion: v1alpha1
 kind: HostnameConfig
 hostname: ms-a2-01
-

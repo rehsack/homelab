@@ -4,10 +4,9 @@ Stand: 2026-05-15
 
 ## Prinzip
 
-Secrets liegen **verschlüsselt direkt in den YAML-Dateien** im Git.
-Verschlüsselung erfolgt feldweise via [SOPS](https://github.com/getsops/sops)
-mit [age](https://github.com/FiloSottile/age) als Backend.
-Nicht-sensitive Felder bleiben im Klartext — Diffs und Reviews funktionieren normal.
+Secrets liegen **verschlüsselt direkt in den YAML-Dateien** im Git. Verschlüsselung erfolgt feldweise via
+[SOPS](https://github.com/getsops/sops) mit [age](https://github.com/FiloSottile/age) als Backend. Nicht-sensitive
+Felder bleiben im Klartext — Diffs und Reviews funktionieren normal.
 
 ## Voraussetzungen
 
@@ -15,8 +14,7 @@ Nicht-sensitive Felder bleiben im Klartext — Diffs und Reviews funktionieren n
 brew install sops age
 ```
 
-Der age-Privatschlüssel wird **pro Projekt** konfiguriert, nicht global.
-Public Key: siehe `.sops.yaml` im Repo-Root.
+Der age-Privatschlüssel wird **pro Projekt** konfiguriert, nicht global. Public Key: siehe `.sops.yaml` im Repo-Root.
 
 ```bash
 # Variante A: per Aufruf
@@ -28,16 +26,15 @@ export SOPS_AGE_KEY_FILE=~/.config/sops/age/homelab.txt
 
 ## Verschlüsselte Dateien
 
-| Datei | Verschlüsselte Felder |
-|---|---|
-| `talos/secrets.yaml` | `id`, `secret`, `bootstraptoken`, `secretboxencryptionsecret`, `token`, `crt`, `key` |
-| `talos/talosconfig.yaml` | `ca`, `crt`, `key` |
-| `applications/forgejo/forgejo-secret.yaml` | alle Werte unter `stringData` |
+| Datei                                      | Verschlüsselte Felder                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `talos/secrets.yaml`                       | `id`, `secret`, `bootstraptoken`, `secretboxencryptionsecret`, `token`, `crt`, `key` |
+| `talos/talosconfig.yaml`                   | `ca`, `crt`, `key`                                                                   |
+| `applications/forgejo/forgejo-secret.yaml` | alle Werte unter `stringData`                                                        |
 
-> Die gerenderten Voll-Configs (`controlplane.yaml` / `<node>.yaml`) werden
-> **nicht** versioniert — sie liegen lokal in `talos/.gen/` (gitignored).
-> Secrets-Quelle ist `talos/secrets.yaml`; `gen config` rendert sie via
-> `sops exec-file` in die generierte Config.
+> Die gerenderten Voll-Configs (`controlplane.yaml` / `<node>.yaml`) werden **nicht** versioniert — sie liegen lokal in
+> `talos/.gen/` (gitignored). Secrets-Quelle ist `talos/secrets.yaml`; `gen config` rendert sie via `sops exec-file` in
+> die generierte Config.
 
 ## Täglicher Umgang
 
