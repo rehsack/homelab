@@ -22,19 +22,19 @@ nodes.
 > or topology change, update this table and the affected sections in the SAME change — never let CLAUDE.md drift behind
 > reality. Verify against the live cluster (`kubectl get nodes -o wide`, `ceph -s`, `talosctl version`) before editing.
 
-| Component        | Details                                                                                                                                                                                                                                                                                             |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OS               | Talos Linux 1.13.6                                                                                                                                                                                                                                                                                  |
-| Kubernetes       | 1.36.2                                                                                                                                                                                                                                                                                              |
-| CNI              | Cilium 1.19.5 (kube-proxy replacement, WireGuard encryption, Hubble UI)                                                                                                                                                                                                                             |
-| Storage          | Rook-Ceph, 4× Samsung 990 PRO 4TB NVMe as OSDs (2 per node)                                                                                                                                                                                                                                         |
-| StorageClasses   | `rook-cephfs` + `rook-ceph-block` — which one when: arc42 ADR-H-009                                                                                                                                                                                                                                 |
-| Ceph replication | `size: 2`, failure domain `host` (transitioned from `osd` when ms-a2-01 joined)                                                                                                                                                                                                                     |
-| Nodes            | `f5a-01` at `192.168.47.40` (CP), `ms-a2-01` at `192.168.47.39` (worker)                                                                                                                                                                                                                            |
-| Control Plane    | Single CP f5a-01. Canonical endpoint `https://192.168.47.40:6443` (SSOT: `talos/homelab-endpoint.yaml`). VIP `192.168.47.240` is configured on enp197s0 and usable as a client access path — cold-start gate passed 2026-10-23 (power outage); promotion to canonical endpoint happens with Phase 3 |
-| LoadBalancer     | Cilium LB-IPAM + L2 Announcements, pool `192.168.47.200-209`                                                                                                                                                                                                                                        |
-| Ingress          | None yet                                                                                                                                                                                                                                                                                            |
-| Secrets          | SOPS + age (field-level encryption in Git); cluster-side decryption TBD                                                                                                                                                                                                                             |
+| Component        | Details                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| OS               | Talos Linux 1.13.6                                                                    |
+| Kubernetes       | 1.36.2                                                                                |
+| CNI              | Cilium 1.19.5 (kube-proxy replacement, WireGuard encryption, Hubble UI)               |
+| Storage          | Rook-Ceph, 4× Samsung 990 PRO 4TB NVMe as OSDs (2 per node)                           |
+| StorageClasses   | `rook-cephfs` + `rook-ceph-block` — which one when: arc42 ADR-H-009                   |
+| Ceph replication | `size: 2`, failure domain `host` (transitioned from `osd` when ms-a2-01 joined)       |
+| Nodes            | `f5a-01` at `192.168.47.40` (CP), `ms-a2-01` at `192.168.47.39` (worker)              |
+| Control Plane    | Single CP f5a-01, endpoint `192.168.47.40:6443` (SSOT: `talos/homelab-endpoint.yaml`) |
+| LoadBalancer     | Cilium LB-IPAM + L2 Announcements, pool `192.168.47.200-209`                          |
+| Ingress          | None yet                                                                              |
+| Secrets          | SOPS + age (field-level encryption in Git); cluster-side decryption TBD               |
 
 - **Talos 1.13 reproducible images**: Same build → identical disk image (raw images; VHD/VMDK excluded). Reinforces the
   schematic-pinned upgrade workflow.
@@ -90,7 +90,7 @@ Full roster, hardware specs, and rationale (ADR-H-003…007, incl. the voided NU
   Ceph OSD). Cluster NIC = Realtek `enp3s0` (ADR-H-005), DHCP fixlease `.39` bound to its MAC. Boot: external USB-C NVMe
   (RTL9210 bridge) — use the *non-USB4* Type-C port; the `usb-storage.quirks` kernel arg is pinned in
   `talos/ms-a2-01-schematics.yaml` (USB4 port renegotiation-loops with the bridge). Result: Ceph failure domain
-  transitioned `osd` → `host`; still single CP (endpoint/VIP status → Cluster Overview table).
+  transitioned `osd` → `host`; still single CP.
 - **Phase 3 — SER6 Pro:** pending. Joins *together with* promoting MS-A2 to CP (1→3 etcd in one step). Canonical
   endpoint moves to VIP `.240` once 3-CP is healthy (VIP cold-start gate already passed).
 - **Phase 4 — MS-02 Ultra (tentative):** more OSDs toward `size: 3`. Don't plan around it until the MS-A2 setup proves
@@ -153,6 +153,8 @@ homelab/
     llm-capable): f5a-01 = (true, false, true); ms-a2-01 = (true, true, false); ser6 = (false, true, false); ms-02 =
     tbd.
 - Refer to existing YAMLs in `infrastructure/rook-ceph/` for formatting style.
+- **QA gates**: `lefthook.yml` (lefthook-qa-gates contract + AsciiDoc); run them locally before every commit — setup in
+  `helpers/README.md`, "QA fleet".
 
 ## Design Principles
 
