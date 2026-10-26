@@ -24,8 +24,8 @@ Update-Runde Oktober 2026::
 Erledigt: Cilium 1.20.4, Ceph 19.2.7 samt Rotation der Daemon-Schlüssel
 (CVE-2025-30156), Rook 1.20.9 mit `ceph-csi-drivers` 1.0.4, Talos 1.14.4 (nur OS) samt
 `talosctl` 1.14.4 und wöchentlichem TRIM, Kaltstart-Abnahme beider Knoten
-(Powercycle, 2026-10-26). Offen: K8s 1.36.5 und etcd-3.6-Patch, dann Forgejo
-(nächster Punkt).
+(Powercycle, 2026-10-26), Kubernetes 1.36.5 mit etcd 3.6.16 und CoreDNS 1.14.7.
+Offen: Forgejo (nächster Punkt).
 Auslöser;; läuft.
 
 Forgejo auf Block migrieren und spiegeln::

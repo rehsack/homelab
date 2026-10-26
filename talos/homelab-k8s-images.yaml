@@ -8,24 +8,29 @@
 # machines"). Workers pin only kubelet (in their machine patch). With a single
 # CP today this is one node; revisit when CP count grows in Phase 3.
 #
-# Versions match the Talos v1.13.6 defaults (verified via
-#   talosctl image k8s-bundle --k8s-version v1.36.2 --etcd-version v3.6.12).
-# coreDNS/etcd are unchanged from 1.13.4; only the k8s components move to 1.36.2.
-# To bump Kubernetes: change the tags here, commit, re-apply — the diff is the
-# upgrade record. No node reboot needed for a pure k8s-component bump (static
-# pods + kubelet restart in place); the OS/extension version is bumped
-# separately via the node's talos/<node>-schematics.yaml + `talosctl upgrade`.
+# Latest patches of the pinned minors (Kubernetes 1.36, etcd 3.6, CoreDNS 1.14),
+# not the Talos defaults: Talos 1.14 would bring Kubernetes 1.37 and etcd 3.7
+# (req42 roadmap).
+# To bump: change the tags here (kubelet in both <node>-machine.yaml), then
+#   1. etcd: `talosctl patch mc` with the etcd image only — restarts etcd alone;
+#   2. the rest: `talosctl upgrade-k8s --to <version>` — pre-pulls, orders
+#      apiserver → controller-manager → scheduler → kubelets, and syncs the
+#      bootstrap manifests; only that sync rolls a new coreDNS image out.
+#      upgrade-k8s writes the same images as pinned here; check the live
+#      machine configs against this file afterwards.
+# No node reboot needed; the OS/extension version is bumped separately via the
+# node's talos/<node>-schematics.yaml + `talosctl upgrade`.
 #
 # kube-proxy is intentionally absent: Cilium runs kube-proxy replacement
 # (cluster.proxy.disabled=true in homelab-cilium.yaml).
 cluster:
   apiServer:
-    image: registry.k8s.io/kube-apiserver:v1.36.2
+    image: registry.k8s.io/kube-apiserver:v1.36.5
   controllerManager:
-    image: registry.k8s.io/kube-controller-manager:v1.36.2
+    image: registry.k8s.io/kube-controller-manager:v1.36.5
   scheduler:
-    image: registry.k8s.io/kube-scheduler:v1.36.2
+    image: registry.k8s.io/kube-scheduler:v1.36.5
   coreDNS:
-    image: registry.k8s.io/coredns/coredns:v1.14.2
+    image: registry.k8s.io/coredns/coredns:v1.14.7
   etcd:
-    image: registry.k8s.io/etcd:v3.6.12
+    image: registry.k8s.io/etcd:v3.6.16
