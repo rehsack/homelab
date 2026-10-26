@@ -38,6 +38,37 @@ Der Befehl ist idempotent — bei erneutem Aufruf meldet er, dass der User berei
 Nur das Passwort, etwa zum Anmelden, direkt in die Zwischenablage:
 `sops -d --extract '["stringData"]["FORGEJO_ADMIN_PASSWORD"]' applications/forgejo/forgejo-secret.yaml | pbcopy`
 
+== Verwaltung: `exec` oder API-Token
+
+`forgejo admin …` per `kubectl exec` läuft im Pod direkt gegen die Datenbank und braucht
+*keine* Forgejo-Credentials — berechtigt ist, wer per `kubectl` in `soho` darf:
+
+[source,bash]
+----
+kubectl -n soho exec -it deploy/forgejo -c forgejo -- \
+  forgejo admin user create --username <user> --email <mail> \
+    --random-password --must-change-password
+----
+
+Das Einmal-Passwort gehört dem neuen User, nicht ins Repository.
+
+Für Skripte gegen die REST-API ein Token statt des Admin-Passworts — einzeln
+widerrufbar, Scopes nur so weit wie nötig. Es wird erst angelegt, wenn ein Skript es
+braucht (ein ungenutztes Token ist nur Angriffsfläche), und geht dann direkt
+verschlüsselt in `forgejo-secret.yaml`:
+
+[source,bash]
+----
+kubectl -n soho exec deploy/forgejo -c forgejo -- \
+  forgejo admin user generate-access-token --username <admin> \
+    --token-name <zweck> --scopes write:admin --raw \
+  | jq -R . \
+  | sops set --value-stdin applications/forgejo/forgejo-secret.yaml '["stringData"]["FORGEJO_API_TOKEN"]'
+----
+
+Widerrufen: im Web-UI unter _Einstellungen → Anwendungen_ des Token-Inhabers, danach
+den Schlüssel mit `sops unset` aus der Datei entfernen.
+
 == ConfigMap aktualisieren
 
 Die ConfigMap ist nur die Vorlage für den ersten Start: Der Init-Container kopiert sie,
