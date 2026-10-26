@@ -29,9 +29,9 @@ Offen: Forgejo (nächster Punkt).
 Auslöser;; läuft.
 
 Forgejo aktualisieren und spiegeln::
-Die PVC liegt seit 2026-10-26 auf `rook-ceph-block` (ADR-H-009); die alte CephFS-PV
-`forgejo-data-old` bleibt bis zur Freigabe als Rückfall. Offen: `ENABLE_PUSH_CREATE_USER`
-einschalten und Forgejo 14 (keine Patches mehr) auf ein gepflegtes Major heben. Danach legt Jens den User `rehsack` samt SSH-Key an und das
+Die PVC liegt seit 2026-10-26 auf `rook-ceph-block` (ADR-H-009),
+`ENABLE_PUSH_CREATE_USER` ist an. Offen: Forgejo 14 (keine Patches mehr) auf ein
+gepflegtes Major heben. Danach legt Jens den User `rehsack` samt SSH-Key an und das
 Repository wird nach Forgejo gepusht (GitHub: `rehsack/homelab`, öffentlich seit
 2026-10-25). Ein Range-Scan über die alte Historie (CI, `range-gates`) braucht eine
 gitleaks-Allowlist für die 11 auskommentierten Talos-Beispielwerte aus

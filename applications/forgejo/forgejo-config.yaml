@@ -30,6 +30,8 @@ data:
 
     [repository]
     ROOT = /var/lib/gitea/data/gitea/repositories
+    ; `git push` to a missing repository creates it (private by default)
+    ENABLE_PUSH_CREATE_USER = true
 
     [lfs]
     PATH = /var/lib/gitea/data/gitea/lfs

@@ -37,12 +37,22 @@ Der Befehl ist idempotent — bei erneutem Aufruf meldet er, dass der User berei
 
 == ConfigMap aktualisieren
 
-Falls die `app.ini` in der ConfigMap geändert wird, muss die Kopie im PVC gelöscht werden, damit der Init-Container sie neu kopiert:
+Die ConfigMap ist nur die Vorlage für den ersten Start: Der Init-Container kopiert sie,
+wenn im PVC noch keine `app.ini` liegt. Danach ergänzt Forgejo dort selbst erzeugte
+Secrets (`INTERNAL_TOKEN`, `[oauth2] JWT_SECRET`) — die Datei im PVC ist ab dann der
+Stand, die ConfigMap nicht.
+
+WARNING: Die `app.ini` im PVC *nicht* löschen. Forgejo erzeugt die Secrets sonst neu;
+ein neues `JWT_SECRET` macht alle OAuth2-Tokens ungültig.
+
+Eine Änderung deshalb an beiden Stellen nachziehen — in der ConfigMap (für eine
+Neuinstallation) und gezielt in der Datei im PVC:
 
 [source,bash]
 ----
 kubectl apply -f applications/forgejo/forgejo-config.yaml
-kubectl -n soho exec deploy/forgejo -- rm /var/lib/gitea/custom/conf/app.ini
+kubectl -n soho exec deploy/forgejo -c forgejo -- \
+  sed -i '/^\[repository\]/a KEY = value' /var/lib/gitea/custom/conf/app.ini
 kubectl -n soho rollout restart deploy/forgejo
 ----
 
