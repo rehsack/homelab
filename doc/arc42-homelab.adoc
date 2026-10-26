@@ -403,8 +403,7 @@ Entscheidung::
 
 Konsequenzen:: Die StorageClass ist eine bewusste Wahl je PVC, kein Pauschal-Default.
 RBD-Volumes sind RWO und an einen Pod gebunden — Pod-Mobilität bleibt erhalten
-(das Image wandert mit), Parallelzugriff nicht. Forgejo (SQLite auf CephFS) verletzt
-die Regel und wird migriert (siehe Risiken).
+(das Image wandert mit), Parallelzugriff nicht. Forgejo (SQLite) liegt auf Block.
 
 == Qualitätsanforderungen
 
@@ -432,7 +431,6 @@ Zeitplanung und Auslöser der Gegenmaßnahmen: `req42-homelab.adoc`, Kapitel 11
 | Backup fehlt | Kein Backup-Konzept. | Bewusst nachgelagert ("kein Cluster, kein Backup"); Pflicht *vor* Produktivlast.
 | Cluster-seitige SOPS-Entschlüsselung | Noch nicht gelöst. | TBD.
 | etcd auf der Boot-SSD (f5a-01) | `EPHEMERAL` — etcd *und* der containerd-Image-Speicher — liegt auf der USB-C-Boot-SSD (`/dev/sda4`). Große Image-Pulls bremsen die etcd-fsyncs über 1 s; auf dem einzigen CP startet dann der Control Plane neu (beobachtet 2026-10-25 beim Cilium-Pre-Flight). Seit Talos 1.14 trimmt `FilesystemTrimConfig` `EPHEMERAL` wöchentlich — derselbe Datenträger, mögliche gleiche Wirkung. | OFFEN — Images vor Rollouts vorab ziehen; ersten TRIM-Lauf auf f5a-01 (`talosctl get volumetrimschedules`) gegen CP-Neustarts prüfen. Entschärft durch 3 CPs (Phase 3); etcd/`EPHEMERAL` auf NVMe kollidiert auf f5a-01 mit den OSDs.
-| Forgejo-SQLite auf CephFS | Forgejo nutzt `DB_TYPE = sqlite3` auf `rook-cephfs` — verletzt ADR-H-009 (Datenbank gehört auf Block). | OFFEN — Migration der Forgejo-PVC auf `rook-ceph-block` geplant.
 | `--config-patch` mixed types | Frühere Notiz "unzuverlässig" stammt aus Vor-1.13-Zeit. | UNVERIFIZIERT für 1.13 — vor Verlass darauf prüfen.
 |===
 

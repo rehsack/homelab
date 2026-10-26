@@ -51,8 +51,11 @@ kubectl -n soho rollout restart deploy/forgejo
 Das PVC `forgejo-data` ist unabhängig vom Pod und Deployment.
 Daten bleiben erhalten, solange das PVC existiert — auch wenn das Deployment gelöscht und neu erstellt wird.
 
-CAUTION: Die StorageClass `rook-cephfs` hat `reclaimPolicy: Delete`.
+CAUTION: Die StorageClass `rook-ceph-block` hat `reclaimPolicy: Delete`.
 Wird das PVC gelöscht, werden auch die Daten unwiderruflich entfernt.
+
+Das PVC liegt auf `rook-ceph-block` (RBD, ext4): SQLite gehört auf Block, nicht auf
+CephFS (arc42 ADR-H-009). Umgezogen am 2026-10-26 — Verfahren unten.
 
 === PVC einsehen
 
@@ -72,30 +75,38 @@ Größe in `forgejo-pvc.yaml` anpassen (z.B. `50Gi` → `100Gi`) und applyen:
 kubectl apply -f applications/forgejo/forgejo-pvc.yaml
 ----
 
-CephFS expandiert online — kein Pod-Neustart nötig.
+Ceph-CSI vergrößert das RBD-Image und danach das ext4 im laufenden Pod — kein Neustart nötig.
 
-=== CephFS-Nutzung überblicken
+=== Belegung überblicken
 
-Gesamtkapazität und Belegung:
+Gesamtkapazität und Belegung je Pool:
 
 [source,bash]
 ----
 kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph df
 ----
 
-Einzelne Subvolumes (entsprechen den PVCs) auflisten:
+RBD-Images (entsprechen den PVCs) mit tatsächlich belegtem Platz:
 
 [source,bash]
 ----
-kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph fs subvolume ls cephfs --group_name csi
+kubectl -n rook-ceph exec deploy/rook-ceph-tools -- rbd du -p replicapool
 ----
 
-Nutzung eines konkreten Subvolumes:
+=== PVC auf eine andere StorageClass umziehen
 
-[source,bash]
-----
-kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph fs subvolume info cephfs <subvolume-name> --group_name csi
-----
+PVC-Namen und StorageClass sind unveränderlich; so bleibt der Name `forgejo-data` und das
+Deployment unberührt, und die alten Daten bleiben bis zum Schluss erhalten:
+
+. Forgejo auf 0 skalieren (SQLite konsistent).
+. Altes PV auf `persistentVolumeReclaimPolicy: Retain` patchen, PVC `forgejo-data` löschen,
+  `claimRef` vom PV entfernen.
+. Das alte PV als statisches PVC `forgejo-data-old` (`volumeName`) neu binden.
+. `forgejo-pvc.yaml` mit der neuen StorageClass applyen.
+. Hilfs-Pod (uid/gid 1000) mit beiden PVCs: `cp -a /old/. /new/`, dann Dateiliste und
+  `md5sum` beider Seiten vergleichen.
+. Forgejo starten und prüfen; erst danach `forgejo-data-old` und das alte PV löschen
+  (PV vorher auf `Delete` zurückstellen, damit Ceph-CSI das Volume mit entfernt).
 
 === Pod-zu-PVC-Zuordnung
 
