@@ -32,8 +32,9 @@ Forgejo auf der Stable-Linie halten::
 Regelmäßig am Ball bleiben, nicht LTS. Kadenz (Stand 2026-10): ein Major pro Quartal
 (Mitte Jan/Apr/Jul/Okt), x.0.1 nach 1–23 Tagen, die Vorgängerlinie endet 14 Tage nach
 x.0.0. 15 LTS (bis 2027-07-15) nimmt den EOL-Druck für den Einstieg; danach jedes
-Quartal auf x.0.1 (Verfahren: `applications/forgejo/README.adoc`, Upgrade).
-Auslöser;; Forgejo 17.0.1; danach jedes neue x.0.1.
+Quartal auf die neue Linie (Verfahren: `applications/forgejo/README.adoc`, Upgrade).
+Kommt binnen 3 Wochen kein x.0.1, ist offenbar nichts Kritisches offen — dann x.0.0.
+Auslöser;; x.0.1 der neuen Linie, spätestens 3 Wochen nach x.0.0 (für 17: 2026-11-05).
 
 === Mittelfristig
 
