@@ -23,9 +23,8 @@ wird gestrichen, nicht abgehakt; die Historie steht in Git.
 Update-Runde Oktober 2026::
 Erledigt: Cilium 1.20.4, Ceph 19.2.7 samt Rotation der Daemon-Schlüssel
 (CVE-2025-30156), Rook 1.20.9 mit `ceph-csi-drivers` 1.0.4, Talos 1.14.4 (nur OS) samt
-`talosctl` 1.14.4.
-Offen, in dieser Reihenfolge: `FilesystemTrimConfig` (fehlt nach Upgrades, TRIM ist
-sonst aus), Kaltstart-Abnahme beider Knoten, K8s 1.36.5
+`talosctl` 1.14.4 und wöchentlichem TRIM. Offen, in dieser Reihenfolge:
+Kaltstart-Abnahme beider Knoten, K8s 1.36.5
 und etcd-3.6-Patch, dann Forgejo (nächster Punkt).
 Auslöser;; läuft.
 
