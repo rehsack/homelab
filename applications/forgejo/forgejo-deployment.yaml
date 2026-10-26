@@ -87,25 +87,4 @@ spec:
         - name: config
           configMap:
             name: forgejo-config
-      # -----------------------------------------------------------
-      # Admin user creation (run once after first deployment):
-      #
-      #   kubectl -n soho exec deploy/forgejo -- \
-      #     forgejo admin user create \
-      #       --admin \
-      #       --username <USER> \
-      #       --password <PASSWORD> \
-      #       --email <EMAIL> \
-      #       --must-change-password=false
-      #
-      # Or using the secret values:
-      #
-      #   export SECRET=$(kubectl -n soho get secret forgejo-admin-secret -o jsonpath='{.data}')
-      #   kubectl -n soho exec deploy/forgejo -- \
-      #     forgejo admin user create \
-      #       --admin \
-      #       --username "$(echo $SECRET | jq -r '.FORGEJO_ADMIN_USER' | base64 -d)" \
-      #       --password "$(echo $SECRET | jq -r '.FORGEJO_ADMIN_PASSWORD' | base64 -d)" \
-      #       --email "$(echo $SECRET | jq -r '.FORGEJO_ADMIN_EMAIL' | base64 -d)" \
-      #       --must-change-password=false
-      # -----------------------------------------------------------
+      # Admin user creation: README.adoc, "Admin-User erstellen".

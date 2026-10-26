@@ -16,24 +16,27 @@ kubectl apply -f applications/forgejo/forgejo-service.yaml
 
 == Admin-User erstellen
 
-Credentials aus dem KeePass-Tresor holen und den Admin-User anlegen:
+Die Credentials liegen SOPS-verschlüsselt in `forgejo-secret.yaml` (Schlüssel
+`FORGEJO_ADMIN_USER`, `FORGEJO_ADMIN_PASSWORD`, `FORGEJO_ADMIN_EMAIL`):
 
 [source,bash]
 ----
-ADMIN_USER=$(bin/kdbx-fetch cred --entry forgejo/admin --attribute UserName --quiet)
-ADMIN_PASS=$(bin/kdbx-fetch cred --entry forgejo/admin --attribute Password --quiet)
-ADMIN_MAIL=$(bin/kdbx-fetch cred --entry forgejo/admin --attribute URL --quiet)
+f=applications/forgejo/forgejo-secret.yaml
+get() { sops -d --extract "[\"stringData\"][\"$1\"]" "$f"; }
 
-kubectl -n soho exec deploy/forgejo -- \
+kubectl -n soho exec deploy/forgejo -c forgejo -- \
   forgejo admin user create \
     --admin \
-    --username "${ADMIN_USER}" \
-    --password "${ADMIN_PASS}" \
-    --email "${ADMIN_MAIL}" \
+    --username "$(get FORGEJO_ADMIN_USER)" \
+    --password "$(get FORGEJO_ADMIN_PASSWORD)" \
+    --email "$(get FORGEJO_ADMIN_EMAIL)" \
     --must-change-password=false
 ----
 
 Der Befehl ist idempotent — bei erneutem Aufruf meldet er, dass der User bereits existiert.
+
+Nur das Passwort, etwa zum Anmelden, direkt in die Zwischenablage:
+`sops -d --extract '["stringData"]["FORGEJO_ADMIN_PASSWORD"]' applications/forgejo/forgejo-secret.yaml | pbcopy`
 
 == ConfigMap aktualisieren
 
