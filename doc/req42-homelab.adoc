@@ -20,24 +20,20 @@ wird gestrichen, nicht abgehakt; die Historie steht in Git.
 
 === Als Nächstes
 
-Update-Runde Oktober 2026::
-Erledigt: Cilium 1.20.4, Ceph 19.2.7 samt Rotation der Daemon-Schlüssel
-(CVE-2025-30156), Rook 1.20.9 mit `ceph-csi-drivers` 1.0.4, Talos 1.14.4 (nur OS) samt
-`talosctl` 1.14.4 und wöchentlichem TRIM, Kaltstart-Abnahme beider Knoten
-(Powercycle, 2026-10-26), Kubernetes 1.36.5 mit etcd 3.6.16 und CoreDNS 1.14.7.
-Offen: Forgejo (nächster Punkt).
-Auslöser;; läuft.
+Repository nach Forgejo spiegeln::
+Forgejo ist bereit: PVC auf `rook-ceph-block` (ADR-H-009), `ENABLE_PUSH_CREATE_USER`
+an, 15.0.10. Jens legt den User `rehsack` samt SSH-Key an, dann wird das Repository
+nach Forgejo gepusht (GitHub: `rehsack/homelab`, öffentlich seit 2026-10-25). Ein
+Range-Scan über die alte Historie (CI, `range-gates`) braucht eine gitleaks-Allowlist
+für die 11 auskommentierten Talos-Beispielwerte aus `talosctl gen config`.
+Auslöser;; User `rehsack` angelegt.
 
-Forgejo aktualisieren und spiegeln::
-Die PVC liegt seit 2026-10-26 auf `rook-ceph-block` (ADR-H-009),
-`ENABLE_PUSH_CREATE_USER` ist an, Forgejo 15.0.10 läuft (14 war seit 2026-04-30 EOL).
-Offen: auf die aktuelle Stable-Linie (17) — Jens will regelmäßig am Ball bleiben, nicht
-LTS; Zeitpunkt nach der Patch-Kadenz. Danach legt Jens den User `rehsack` samt SSH-Key an und das
-Repository wird nach Forgejo gepusht (GitHub: `rehsack/homelab`, öffentlich seit
-2026-10-25). Ein Range-Scan über die alte Historie (CI, `range-gates`) braucht eine
-gitleaks-Allowlist für die 11 auskommentierten Talos-Beispielwerte aus
-`talosctl gen config`.
-Auslöser;; Ende der Update-Runde; spätestens vor produktiver Forgejo-Nutzung.
+Forgejo auf der Stable-Linie halten::
+Regelmäßig am Ball bleiben, nicht LTS. Kadenz (Stand 2026-10): ein Major pro Quartal
+(Mitte Jan/Apr/Jul/Okt), x.0.1 nach 1–23 Tagen, die Vorgängerlinie endet 14 Tage nach
+x.0.0. 15 LTS (bis 2027-07-15) nimmt den EOL-Druck für den Einstieg; danach jedes
+Quartal auf x.0.1 (Verfahren: `applications/forgejo/README.adoc`, Upgrade).
+Auslöser;; Forgejo 17.0.1; danach jedes neue x.0.1.
 
 === Mittelfristig
 
