@@ -56,6 +56,41 @@ kubectl -n soho exec deploy/forgejo -c forgejo -- \
 kubectl -n soho rollout restart deploy/forgejo
 ----
 
+== Upgrade (Snapshot → Upgrade → Test → ggf. Rollback)
+
+Das Image ist auf den exakten Patch gepinnt (`forgejo-deployment.yaml`). Forgejo
+unterstützt den direkten Sprung auf die Zielversion, die Migrationen laufen beim Start;
+vorher die Breaking Changes aller übersprungenen Majors lesen
+(`release-notes-published/<version>.md` im Forgejo-Repo, Upgrade-Guide in der Doku).
+
+Das RBD-Image hinter dem PVC, für die `rbd`-Befehle unten (alle per
+`kubectl -n rook-ceph exec deploy/rook-ceph-tools --`):
+
+[source,bash]
+----
+PV=$(kubectl -n soho get pvc forgejo-data -o jsonpath='{.spec.volumeName}')
+IMG=$(kubectl get pv $PV -o jsonpath='{.spec.csi.volumeAttributes.pool}/{.spec.csi.volumeAttributes.imageName}')
+----
+
+. Image auf beiden Knoten vorab ziehen (Image-Volume-DaemonSet, wie bei Rook —
+  `infrastructure/rook-ceph/README.md`), dann `forgejo manager flush-queues`.
+. Baseline: `forgejo doctor check --all` — Befunde von vorher sind dann keine
+  Upgrade-Folgen.
+. Forgejo auf 0, warten bis `rbd status $IMG` *keine* Watchers mehr zeigt (Volume
+  ausgehängt, SQLite konsistent), dann `rbd snap create $IMG@pre-forgejo-<version>`.
+. Image-Tag in `forgejo-deployment.yaml` setzen, `kubectl apply`.
+. Prüfen: Migrations-Log ohne Fehler, `forgejo doctor check --all`, Login und ein
+  typischer Ablauf im Web-UI.
+. *Rollback*, falls etwas nicht stimmt: Forgejo auf 0, warten bis keine Watchers,
+  `rbd snap rollback $IMG@pre-forgejo-<version>`, alten Tag zurück, `kubectl apply`.
+  Ein Downgrade *ohne* Rollback verweigert Forgejo (Datenbank-Version).
+. Wenn alles passt: `rbd snap rm $IMG@pre-forgejo-<version>` — ein Snapshot ist kein
+  Backup und wird mit der Zeit teuer.
+
+`doctor` scheitert an `data/gitea/repositories` und `log/`, solange es kein Repository
+bzw. kein Datei-Log gibt; leer anlegen, dann laufen alle Checks. „Garbage collect LFS"
+meldet `ERROR`, solange LFS aus ist.
+
 == Storage
 
 Das PVC `forgejo-data` ist unabhängig vom Pod und Deployment.

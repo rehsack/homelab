@@ -54,7 +54,7 @@ spec:
               mountPath: /etc/forgejo
       containers:
         - name: forgejo
-          image: codeberg.org/forgejo/forgejo:14-rootless
+          image: codeberg.org/forgejo/forgejo:15.0.10-rootless   # pin exact patch — never a floating tag
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
