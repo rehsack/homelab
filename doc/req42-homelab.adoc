@@ -20,14 +20,6 @@ wird gestrichen, nicht abgehakt; die Historie steht in Git.
 
 === Als Nächstes
 
-Repository nach Forgejo spiegeln::
-Forgejo ist bereit: PVC auf `rook-ceph-block` (ADR-H-009), `ENABLE_PUSH_CREATE_USER`
-an, 15.0.10. Jens legt den User `rehsack` samt SSH-Key an, dann wird das Repository
-nach Forgejo gepusht (GitHub: `rehsack/homelab`, öffentlich seit 2026-10-25). Ein
-Range-Scan über die alte Historie (CI, `range-gates`) braucht eine gitleaks-Allowlist
-für die 11 auskommentierten Talos-Beispielwerte aus `talosctl gen config`.
-Auslöser;; User `rehsack` angelegt.
-
 Forgejo auf der Stable-Linie halten::
 Regelmäßig am Ball bleiben, nicht LTS. Kadenz (Stand 2026-10): ein Major pro Quartal
 (Mitte Jan/Apr/Jul/Okt), x.0.1 nach 1–23 Tagen, die Vorgängerlinie endet 14 Tage nach
@@ -69,6 +61,14 @@ Talos 1.14 markiert große Teile der v1alpha1-Config als deprecated (`.machine.k
 weiter. Migration der Patches in `talos/` auf die neuen Dokumente.
 Auslöser;; Talos-Release, das ein genutztes Feld entfernt; spätestens Phase 3
 (neue Knoten-Configs).
+
+CI auf Forgejo::
+Das Repository liegt seit 2026-10-26 auf Forgejo (`rehsack/homelab`, privat) und
+GitHub (öffentlich). CI nach dem lefthook-qa-gates-Vertrag: im Gates-Image
+`lefthook run pre-commit --all-files`, für Merge-Requests `range-gates`. Der Range-Scan über die
+alte Historie braucht eine gitleaks-Allowlist für die 11 auskommentierten
+Talos-Beispielwerte aus `talosctl gen config`.
+Auslöser;; erster Forgejo-Actions-Runner im Cluster.
 
 etcd-CA rotieren::
 Der private Schlüssel der etcd-CA stand am 2026-10-26 im Klartext in einem
